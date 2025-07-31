@@ -78,10 +78,12 @@ func ServiceForwardHandler(c *gin.Context) {
 	service, err := protocol.GetService(serviceName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	target := url.URL{
 		Scheme: "http",
@@ -112,10 +114,12 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 	providers, err := protocol.GetAllProviders(serviceName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	// find proper service that are within the same identity group
 	// first filter by service name, then iterative over the identity groups
@@ -148,6 +152,11 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 			}
 		}
 	}
+	if len(candidates) < 1 {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No provider found for the requested service."})
+		return
+	}
+	
 	// randomly select one of the candidates
 	// here's where we can implement a load balancing algorithm
 	randomIndex := rand.Intn(len(candidates))
