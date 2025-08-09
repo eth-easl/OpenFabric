@@ -1,3 +1,4 @@
 examples/
 _internal/
 .env
+__pycache__
