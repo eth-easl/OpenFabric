@@ -58,13 +58,18 @@ func registerLLMService(port string) {
 	if err != nil {
 		common.Logger.Error("could not unmarshal models from LLM service: ", err)
 	}
+	var identityGroup []string
+	for _, model := range availableModels.Models {
+		identityGroup = append(identityGroup, "model="+model.Id)
+	}
+
 	// register the models
 	service := Service{
 		Name:          "llm",
 		Status:        "connected",
 		Host:          "localhost",
 		Port:          port,
-		IdentityGroup: []string{"model=" + availableModels.Models[0].Id},
+		IdentityGroup: identityGroup,
 	}
 	provideService(service)
 }

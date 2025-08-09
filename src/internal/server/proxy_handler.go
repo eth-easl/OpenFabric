@@ -126,10 +126,9 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 	// always find all the services that are in the same identity group
 	var candidates []string
 	for _, provider := range providers {
-		selected := false
 		for _, service := range provider.Service {
 			if service.Name == serviceName {
-				selected = true
+				var selected = false
 				// check if the service is in the same identity group
 				if len(service.IdentityGroup) > 0 {
 					for _, ig := range service.IdentityGroup {
@@ -137,11 +136,9 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 						igKey := igGroup[0]
 						igValue := igGroup[1]
 						requestGroup, err := jsonparser.GetString(body, igKey)
-						if err != nil {
-							selected = false
-						}
-						if requestGroup != igValue {
-							selected = false
+						if err == nil && requestGroup == igValue {
+							selected = true
+							break
 						}
 					}
 				}
@@ -156,7 +153,7 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No provider found for the requested service."})
 		return
 	}
-	
+
 	// randomly select one of the candidates
 	// here's where we can implement a load balancing algorithm
 	randomIndex := rand.Intn(len(candidates))
