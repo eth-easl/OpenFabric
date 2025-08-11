@@ -38,8 +38,11 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 
 		ipfs, err = ipfslite.New(ctx, store, nil, host, &dht, nil)
 		common.ReportError(err, "Error while creating ipfs lite node")
-
-		psub, err := pubsub.NewGossipSub(ctx, host)
+		pubsubParams := pubsub.DefaultGossipSubParams()
+		pubsubParams.D = 128
+		pubsubParams.Dlo = 16
+		pubsubParams.Dhi = 256
+		psub, err := pubsub.NewGossipSub(ctx, host, pubsub.WithGossipSubParams(pubsubParams))
 		common.ReportError(err, "Error while creating pubsub")
 
 		topic, err := psub.Join(pubsubNet)
