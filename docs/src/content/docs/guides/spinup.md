@@ -15,14 +15,14 @@ Spinning up a new global dispatcher requires the following prerequisites:
 
 ### Install by Downloading the Binary
 
-1. Download the binary from the [release page](https://github.com/autoai-org/OpenComputeFramework/releases/tag/v0.1.0-alpha). There are pre-built binaries for both `amd64` and `arm64` architectures.
+1. Download the binary from the [release page](https://github.com/researchcomputer/OpenComputeFramework/releases). There are pre-built binaries for both `amd64` and `arm64` architectures.
 
 ### (Alternatively) Install by Building from Source
 
-1. To build from source, you need to have `go` (and we only tested with `go-1.22.5`) installed on your machine. Full installation guide can be found [here](https://go.dev/doc/install). On Linux, you can install `go` by running the following command:
+1. To build from source, you need to have `go` (tested with `go-1.22.5`) installed on your machine. Full installation guide can be found [here](https://go.dev/doc/install). On Linux, you can install `go` by running the following command:
 
 ```
-wget //go.dev/dl/go1.22.5.linux-amd64.tar.gz
+wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
 rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz # you may need sudo
 export PATH=$PATH:/usr/local/go/bin
 ```
@@ -89,12 +89,27 @@ It will start the global dispatcher on port `8092` and show the following output
 
 You can find your peer ID in the output. Remember to keep it as it will be used by the workers to connect to the global dispatcher.
 
+### Ports
+
+- REST API: `8092` (HTTP)
+- LibP2P: `43905/tcp`, `43905/tcp/ws`, `59820/udp/quic`
+
+### Run as a public bootstrap
+
+If your node has a publicly reachable IP, set it so other peers can discover you as a bootstrap:
+
+```bash
+./ocf-amd64 start \
+  --public-addr=<your-public-ip> \
+  --mode node
+```
+
 ## Connect Workers to the Global Dispatcher
 
 To connect the workers to the global dispatcher, you need to start the workers (on the worker node) with the following command:
 
 ```bash
-./build/ocf-amd64 start --bootstrap.addr=/ip4/<ip addr of global dispatcher>/tcp/43905/p2p/<Peer ID of global dispatcher>
+./ocf-amd64 start --bootstrap.addr=/ip4/<ip-of-global-dispatcher>/tcp/43905/p2p/<PeerID-of-global-dispatcher>
 ```
 
 Once connected, you can view:
@@ -108,9 +123,9 @@ You have successfully spun up a new global dispatcher and connected workers to i
 
 ```
 client = OpenAI(
-    base_url = "http://<ip addr of global dispatcher>:8092/v1/service/triteia/v1",
-    api_key = "sk-1234567",
+    base_url = "http://<dispatcher-ip>:8092/v1/service/llm/v1",
+    api_key = "any",
 )
 ```
 
-(triteia is an old name of a ML inference service, and it is used as an example here. You can replace it with the actual service name.)
+Note: The `llm` service routes to any provider that has registered the requested `model`.

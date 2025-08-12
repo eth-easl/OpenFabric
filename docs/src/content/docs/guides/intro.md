@@ -12,7 +12,7 @@ description: Introduction to Open Compute Framework.
 In many cases, a single individual or organization won't have enough resources to run a large-scale computing task. We were facing two main challenges in the past:
 
 * Running LLM inference at a large scale is prohibitively expensive, especially when we need to run many different models on a large benchmark dataset.
-* We were hosting a generic benchmark and inviting participants, which exihibits a bursty workload. We need to pay for the idle time when the benchmark is not running.
+* We were hosting a generic benchmark and inviting participants, which exhibits a bursty workload. We need to pay for the idle time when the benchmark is not running.
 
 We believe that decentralized computing can help us solve these problems, in the following ways:
 
