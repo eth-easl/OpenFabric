@@ -224,5 +224,8 @@ func InitializeMyself() {
 	myself.Hardware.GPUs = platform.GetGPUInfo()
 	value, err := json.Marshal(myself)
 	common.ReportError(err, "Error while marshalling peer")
-	store.Put(ctx, key, value)
+	err = store.Put(ctx, key, value)
+	if err != nil {
+		common.Logger.Error("Error while initializing myself in the node table: ", err)
+	}
 }

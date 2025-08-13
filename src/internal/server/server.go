@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"embed"
 	"net/http"
 	"ocf/internal/common"
 	"ocf/internal/common/process"
@@ -11,13 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )
-
-//go:embed ui
-var ui embed.FS
 
 func StartServer() {
 	protocol.InitializeMyself()
@@ -30,7 +25,6 @@ func StartServer() {
 	// gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(corsHeader())
-	r.Use(static.Serve("/", static.EmbedFolder(ui, "ui")))
 	r.Use(gin.Recovery())
 
 	go protocol.StartTicker()

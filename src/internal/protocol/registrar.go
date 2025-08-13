@@ -134,7 +134,10 @@ func provideService(service Service) {
 	common.Logger.Info("Registering LLM service: ", myself)
 	value, err := json.Marshal(myself)
 	common.ReportError(err, "Error while marshalling peer")
-	store.Put(ctx, key, value)
+	err = store.Put(ctx, key, value)
+	if err != nil {
+		common.Logger.Debug("Error while providing service: ", err)
+	}
 }
 
 // ReannounceLocalServices re-publishes this node's service entry, used after reconnects
