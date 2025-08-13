@@ -16,9 +16,8 @@ func init() {
 	}
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	config.Level.SetLevel(zapcore.InfoLevel)
-	zapLogger, err := config.Build()
-	// trunk-ignore(golangci-lint/errcheck)
-	defer zapLogger.Sync()
+    zapLogger, err := config.Build()
+    defer func() { _ = zapLogger.Sync() }()
 	if err != nil {
 		panic(err)
 	}

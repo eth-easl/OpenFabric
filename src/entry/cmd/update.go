@@ -20,11 +20,11 @@ func doUpdate() error {
 		return err
 	}
 	defer resp.Body.Close()
-	err = selfupdate.Apply(resp.Body, selfupdate.Options{})
-	if err != nil {
-		// error handling
-	}
-	return err
+    err = selfupdate.Apply(resp.Body, selfupdate.Options{})
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 var updateCmd = &cobra.Command{

@@ -54,7 +54,7 @@ func P2PForwardHandler(c *gin.Context) {
 		Host:   requestPeer,
 		Path:   requestPath,
 	}
-	common.Logger.Info("Forwarding request to %s", target.String())
+	common.Logger.Infof("Forwarding request to %s", target.String())
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Path = target.Path

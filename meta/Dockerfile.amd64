@@ -2,7 +2,7 @@ FROM golang:1.23 AS build
 
 WORKDIR /app
 
-COPY . /app
+COPY src/ /app/src
 RUN cd /app/src/ && make build-release
 
 FROM alpine:edge

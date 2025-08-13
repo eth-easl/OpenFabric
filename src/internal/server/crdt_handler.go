@@ -25,9 +25,27 @@ func listBootstraps(c *gin.Context) {
 	c.JSON(200, gin.H{"bootstraps": addrs})
 }
 
+func getResourceStats(c *gin.Context) {
+	// Call the resource manager stats function from protocol package
+	protocol.GetResourceManagerStats()
+
+	// Also return current connection count
+	connectedPeers := protocol.ConnectedPeers()
+	allPeers := protocol.AllPeers()
+
+	c.JSON(200, gin.H{
+		"connected_peers":        len(connectedPeers),
+		"total_peers_known":      len(allPeers),
+		"connected_peer_details": connectedPeers,
+		"all_peer_details":       allPeers,
+		"message":                "Resource manager stats logged to console",
+	})
+}
+
 func updateLocal(c *gin.Context) {
 	var peer protocol.Peer
 	c.BindJSON(&peer)
+	peer.Connected = true
 	protocol.UpdateNodeTable(peer)
 }
 
@@ -42,5 +60,5 @@ func getDNT(c *gin.Context) {
 		{ingest.TimestampField: time.Now(), "event": "DNT Lookup"},
 	}
 	IngestEvents(events)
-	c.JSON(200, protocol.GetNodeTable(false))
+	c.JSON(200, protocol.GetConnectedPeers())
 }

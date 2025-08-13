@@ -69,9 +69,13 @@ func (p *Process) Start() *Process {
 			p.Kill()
 		}()
 	}
-	p.started = true
-	p.proc.Stdout = os.Stdout
-	p.proc.Stderr = os.Stderr
+    p.started = true
+    // If StreamOutput has been set, do not override stdout/stderr to ensure
+    // the caller can consume output via the returned scanner.
+    if !p.outputStreamSet {
+        p.proc.Stdout = os.Stdout
+        p.proc.Stderr = os.Stderr
+    }
 	//Call the other functions to stream stdin and stdout
 	err := p.proc.Start()
 	p.pid = p.proc.Process.Pid
@@ -79,8 +83,8 @@ func (p *Process) Start() *Process {
 	if err != nil {
 		panic(err)
 	}
-	go p.awaitOutput()
-	go p.finishTimeOutOrDie()
+    go p.awaitOutput()
+    go p.finishTimeOutOrDie()
 	return p
 }
 
@@ -145,19 +149,21 @@ func (p *Process) StreamOutput() *bufio.Scanner {
 }
 
 func (p *Process) finishTimeOutOrDie() {
-	defer p.cleanup()
-	var result error
-	select {
-	case result = <-p.done:
-	case <-p.cancellationSignal:
-		log.Println("received cancellationSignal")
-		//NOT PORTABLE TO WINDOWS
-		err := p.proc.Process.Kill()
-		if err != nil {
-			log.Println(err)
-		}
-	}
-	p.returnCode <- result
+    var result error
+    select {
+    case result = <-p.done:
+        // Process finished naturally; we captured the Wait() result
+    case <-p.cancellationSignal:
+        log.Println("received cancellationSignal")
+        // NOT PORTABLE TO WINDOWS
+        if err := p.proc.Process.Kill(); err != nil {
+            log.Println(err)
+        }
+        // Ensure we propagate the actual process exit error after kill
+        result = <-p.done
+    }
+    p.returnCode <- result
+    p.cleanup()
 }
 
 func (p *Process) cleanup() {

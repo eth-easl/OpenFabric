@@ -47,6 +47,7 @@ func StartServer() {
 			crdtGroup.GET("/peers", listPeers)
 			crdtGroup.GET("/peers_status", listPeersWithStatus)
 			crdtGroup.GET("/bootstraps", listBootstraps)
+			crdtGroup.GET("/stats", getResourceStats) // Add resource manager stats endpoint
 			crdtGroup.POST("/_node", updateLocal)
 			crdtGroup.DELETE("/_node", deleteLocal)
 		}
@@ -77,7 +78,7 @@ func StartServer() {
 	go func() {
 		err := http.Serve(p2plistener, r)
 		if err != nil {
-			common.Logger.Error("http.Serve: %s", err)
+			common.Logger.Errorf("http.Serve: %s", err)
 		}
 	}()
 	go func() {

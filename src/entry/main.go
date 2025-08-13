@@ -1,7 +1,7 @@
 package main
 
 import (
-	"ocf/bin/cmd"
+	"ocf/entry/cmd"
 	"ocf/internal/common"
 )
 
@@ -10,12 +10,14 @@ var (
 	version     = "dev"
 	commitHash  = "?"
 	buildDate   = ""
-	buildSecret = ""
+    // buildSecret left for future use to verify official builds
+    buildSecret string
 )
 
 func main() {
 	common.JSONVersion.Version = version
 	common.JSONVersion.Commit = commitHash
 	common.JSONVersion.Date = buildDate
+    _ = buildSecret
 	cmd.Execute()
 }

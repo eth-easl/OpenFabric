@@ -1,141 +1,128 @@
-#![allow(clippy::result_large_err)]
-
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token_interface::{
-    self, Mint, MintTo, TokenAccount, TokenInterface, TransferChecked,
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    metadata::{
+        create_metadata_accounts_v3, mpl_token_metadata::types::DataV2, CreateMetadataAccountsV3,
+        Metadata as Metaplex,
+    },
+    token::{mint_to, Mint, MintTo, Token, TokenAccount},
 };
 
-declare_id!("6qNqxkRF791FXFeQwqYQLEzAbGiqDULC5SSHVsfRoG89");
+declare_id!("3SVic52pd75oKSaQKQvKjHK7pmyH1a4s2duCUVK7eXRV");
 
 #[program]
-pub mod anchor {
-
+mod token_minter {
     use super::*;
+    pub fn init_token(ctx: Context<InitToken>, metadata: InitTokenParams) -> Result<()> {
+        let seeds = &["mint".as_bytes(), &[ctx.bumps.mint]];
+        let signer = [&seeds[..]];
 
-    pub fn create_token(_ctx: Context<CreateToken>, _token_name: String) -> Result<()> {
-        msg!("Create Token");
-        Ok(())
-    }
-    pub fn create_token_account(_ctx: Context<CreateTokenAccount>) -> Result<()> {
-        msg!("Create Token Account");
-        Ok(())
-    }
-    pub fn create_associated_token_account(
-        _ctx: Context<CreateAssociatedTokenAccount>,
-    ) -> Result<()> {
-        msg!("Create Associated Token Account");
-        Ok(())
-    }
-    pub fn transfer_token(ctx: Context<TransferToken>, amount: u64) -> Result<()> {
-        let cpi_accounts = TransferChecked {
-            from: ctx.accounts.from.to_account_info().clone(),
-            mint: ctx.accounts.mint.to_account_info().clone(),
-            to: ctx.accounts.to_ata.to_account_info().clone(),
-            authority: ctx.accounts.signer.to_account_info(),
+        let token_data: DataV2 = DataV2 {
+            name: metadata.name,
+            symbol: metadata.symbol,
+            uri: metadata.uri,
+            seller_fee_basis_points: 0,
+            creators: None,
+            collection: None,
+            uses: None,
         };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
-        token_interface::transfer_checked(cpi_context, amount, ctx.accounts.mint.decimals)?;
-        msg!("Transfer Token");
+
+        let metadata_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_metadata_program.to_account_info(),
+            CreateMetadataAccountsV3 {
+                payer: ctx.accounts.payer.to_account_info(),
+                update_authority: ctx.accounts.mint.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+                metadata: ctx.accounts.metadata.to_account_info(),
+                mint_authority: ctx.accounts.mint.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                rent: ctx.accounts.rent.to_account_info(),
+            },
+            &signer,
+        );
+
+        create_metadata_accounts_v3(metadata_ctx, token_data, false, true, None)?;
+
+        msg!("Token mint created successfully.");
+
         Ok(())
     }
-    pub fn mint_token(ctx: Context<MintToken>, amount: u64) -> Result<()> {
-        let cpi_accounts = MintTo {
-            mint: ctx.accounts.mint.to_account_info().clone(),
-            to: ctx.accounts.receiver.to_account_info().clone(),
-            authority: ctx.accounts.signer.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
-        token_interface::mint_to(cpi_context, amount)?;
-        msg!("Mint Token");
+
+    pub fn mint_tokens(ctx: Context<MintTokens>, quantity: u64) -> Result<()> {
+        let seeds = &["mint".as_bytes(), &[ctx.bumps.mint]];
+        let signer = [&seeds[..]];
+
+        mint_to(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                MintTo {
+                    authority: ctx.accounts.mint.to_account_info(),
+                    to: ctx.accounts.destination.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                },
+                &signer,
+            ),
+            quantity,
+        )?;
+
         Ok(())
     }
+
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
+pub struct InitTokenParams {
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+    pub decimals: u8,
+}
+
+// 4. Define the context for each instruction
 #[derive(Accounts)]
-#[instruction(token_name: String)]
-pub struct CreateToken<'info> {
+#[instruction(
+    params: InitTokenParams
+)]
+pub struct InitToken<'info> {
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub metadata: UncheckedAccount<'info>,
     #[account(
         init,
-        payer = signer,
-        mint::decimals = 6,
-        mint::authority = signer.key(),
-        seeds = [b"token-2022-token", signer.key().as_ref(), token_name.as_bytes()],
+        seeds = [b"mint"],
         bump,
+        payer = payer,
+        mint::decimals = params.decimals,
+        mint::authority = mint,
     )]
-    pub mint: InterfaceAccount<'info, Mint>,
+    pub mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>,
-    pub token_program: Interface<'info, TokenInterface>,
+    pub token_program: Program<'info, Token>,
+    pub token_metadata_program: Program<'info, Metaplex>,
 }
 
 #[derive(Accounts)]
-pub struct CreateTokenAccount<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    pub mint: InterfaceAccount<'info, Mint>,
+pub struct MintTokens<'info> {
     #[account(
-        init,
-        token::mint = mint,
-        token::authority = signer,
-        payer = signer,
-        seeds = [b"researchcomputer2025", signer.key().as_ref(), mint.key().as_ref()],
+        mut,
+        seeds = [b"mint"],
         bump,
+        mint::authority = mint,
     )]
-    pub token_account: InterfaceAccount<'info, TokenAccount>,
-    pub system_program: Program<'info, System>,
-    pub token_program: Interface<'info, TokenInterface>,
-}
-
-#[derive(Accounts)]
-pub struct CreateAssociatedTokenAccount<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    pub mint: InterfaceAccount<'info, Mint>,
+    pub mint: Account<'info, Mint>,
     #[account(
-        init,
+        init_if_needed,
+        payer = payer,
         associated_token::mint = mint,
-        payer = signer,
-        associated_token::authority = signer,
+        associated_token::authority = payer,
     )]
-    pub token_account: InterfaceAccount<'info, TokenAccount>,
+    pub destination: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>,
-    pub token_program: Interface<'info, TokenInterface>,
+    pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-}
-
-#[derive(Accounts)]
-
-pub struct TransferToken<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    #[account(mut)]
-    pub from: InterfaceAccount<'info, TokenAccount>,
-    pub to: SystemAccount<'info>,
-    #[account(
-        init,
-        associated_token::mint = mint,
-        payer = signer,
-        associated_token::authority = to
-    )]
-    pub to_ata: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut)]
-    pub mint: InterfaceAccount<'info, Mint>,
-    pub token_program: Interface<'info, TokenInterface>,
-    pub system_program: Program<'info, System>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
-}
-
-#[derive(Accounts)]
-pub struct MintToken<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    #[account(mut)]
-    pub mint: InterfaceAccount<'info, Mint>,
-    #[account(mut)]
-    pub receiver: InterfaceAccount<'info, TokenAccount>,
-    pub token_program: Interface<'info, TokenInterface>,
 }

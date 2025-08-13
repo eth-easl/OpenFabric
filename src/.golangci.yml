@@ -1,0 +1,12 @@
+run:
+  timeout: 5m
+  modules-download-mode: mod
+  go: "1.23"
+
+linters:
+  disable:
+    - typecheck
+
+issues:
+  exclude-dirs-use-default: true
+

@@ -3,10 +3,12 @@ package protocol
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	mrand "math/rand"
 	"ocf/internal/common"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/ipfs/boxo/ipns"
 	"github.com/ipfs/go-datastore"
@@ -19,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	"github.com/spf13/viper"
@@ -50,15 +53,10 @@ func GetP2PNode(ds datastore.Batching) (host.Host, dualdht.DHT) {
 }
 
 func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host, error) {
-	// connmgr, err := connmgr.NewConnManager(
-	// 	50,
-	// 	500,
-	// 	connmgr.WithGracePeriod(time.Minute),
-	// )
-	// if err != nil {
-	// 	common.Logger.Error("Error while creating connection manager: %v", err)
-	// }
 	var err error
+	if err != nil {
+		common.Logger.Error("Error while creating connection manager: ", err)
+	}
 	var priv crypto.PrivKey
 	// try to load the private key from file
 	if seed == 0 {
@@ -80,10 +78,10 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 		}
 		writeKeyToFile(priv)
 	}
-
 	if err != nil {
 		return nil, err
 	}
+
 	opts := []libp2p.Option{
 		libp2p.DefaultTransports,
 		libp2p.Identity(priv),
@@ -106,7 +104,96 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 			return ddht, err
 		}),
 	}
-	return libp2p.New(opts...)
+
+	host, err := libp2p.New(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log connection events for debugging
+	host.Network().Notify(&network.NotifyBundle{
+		ConnectedF: func(n network.Network, c network.Conn) {
+			common.Logger.Info("Connected to peer: ", c.RemotePeer(), " Total connections: ", len(n.Conns()))
+			// On (re)connections, re-announce local services
+			go ReannounceLocalServices()
+
+			// Mark peer as connected in node table immediately
+			go func(pid peer.ID) {
+				// Avoid updating self
+				if pid == host.ID() {
+					return
+				}
+				p, err := GetPeerFromTable(pid.String())
+				if err != nil {
+					p = Peer{ID: pid.String()}
+				}
+				p.Connected = true
+				p.LastSeen = time.Now().Unix()
+				if b, e := json.Marshal(p); e == nil {
+					UpdateNodeTableHook(datastore.NewKey(pid.String()), b)
+				} else {
+					common.Logger.Error("Failed to marshal peer on connect: ", e)
+				}
+			}(c.RemotePeer())
+		},
+		DisconnectedF: func(n network.Network, c network.Conn) {
+			common.Logger.Info("Disconnected from peer: ", c.RemotePeer(), " Total connections: ", len(n.Conns()))
+			// Mark peer as disconnected in node table immediately
+			go func(pid peer.ID) {
+				if pid == host.ID() {
+					return
+				}
+				p, err := GetPeerFromTable(pid.String())
+				if err != nil {
+					p = Peer{ID: pid.String()}
+				}
+				p.Connected = false
+				// keep LastSeen as last known good; do not bump here
+				if b, e := json.Marshal(p); e == nil {
+					UpdateNodeTableHook(datastore.NewKey(pid.String()), b)
+				} else {
+					common.Logger.Error("Failed to marshal peer on disconnect: ", e)
+				}
+			}(c.RemotePeer())
+		},
+	})
+
+	// Start a background auto-reconnector that watches connectivity
+	go startAutoReconnect(ctx, host)
+
+	return host, nil
+}
+
+// startAutoReconnect periodically checks if we lost connectivity and attempts to reconnect to bootstraps with backoff.
+func startAutoReconnect(ctx context.Context, h host.Host) {
+	// exponential backoff parameters
+	minDelay := 5 * time.Second
+	maxDelay := 2 * time.Minute
+	delay := minDelay
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(30 * time.Second):
+			// If very few or zero peers, try bootstrap
+			conns := h.Network().Conns()
+			if len(conns) == 0 {
+				common.Logger.Warn("No active P2P connections; attempting reconnect to bootstraps...")
+				Reconnect()
+				// after a reconnect attempt, wait with backoff if still disconnected
+				time.Sleep(delay)
+				if delay < maxDelay {
+					delay *= 2
+					if delay > maxDelay {
+						delay = maxDelay
+					}
+				}
+			} else {
+				// reset backoff when connected
+				delay = minDelay
+			}
+		}
+	}
 }
 
 func newDHT(ctx context.Context, h host.Host, ds datastore.Batching) (*dualdht.DHT, error) {
@@ -152,7 +239,7 @@ func AllPeers() []*PeerWithStatus {
 
 func ConnectedBootstraps() []string {
 	var bootstraps = []string{}
-	dnt := GetNodeTable(false)
+	dnt := GetNodeTable()
 	host, _ := GetP2PNode(nil)
 	for _, p := range *dnt {
 		if p.PublicAddress != "" {
@@ -163,5 +250,36 @@ func ConnectedBootstraps() []string {
 			}
 		}
 	}
+	// add myself as bootstrap
+	myaddr := host.Addrs()[0].String() + "/p2p/" + host.ID().String()
+	bootstraps = append(bootstraps, myaddr)
+	// deduplicate
+	bootstraps = common.DeduplicateStrings(bootstraps)
 	return bootstraps
+}
+
+// GetResourceManagerStats returns current resource usage statistics
+func GetResourceManagerStats() {
+	host, _ := GetP2PNode(nil)
+	if rm := host.Network().ResourceManager(); rm != nil {
+		// Try to get stats if available
+		if statsGetter, ok := rm.(interface {
+			Stat() rcmgr.ResourceManagerStat
+		}); ok {
+			stats := statsGetter.Stat()
+			common.Logger.Infof("Resource Manager Stats - System: Conns=%d (in:%d out:%d), Streams=%d (in:%d out:%d), Memory=%d",
+				stats.System.NumConnsInbound+stats.System.NumConnsOutbound,
+				stats.System.NumConnsInbound,
+				stats.System.NumConnsOutbound,
+				stats.System.NumStreamsInbound+stats.System.NumStreamsOutbound,
+				stats.System.NumStreamsInbound,
+				stats.System.NumStreamsOutbound,
+				stats.System.Memory,
+			)
+		} else {
+			common.Logger.Info("Resource Manager present but stats not available")
+		}
+	} else {
+		common.Logger.Info("No Resource Manager configured")
+	}
 }

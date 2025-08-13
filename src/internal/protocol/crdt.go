@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"ocf/internal/common"
 	"sync"
@@ -59,6 +60,15 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 					break
 				}
 				host.ConnManager().TagPeer(msg.ReceivedFrom, "keep", 100)
+				// Update LastSeen when we receive a message from a peer
+				p, gerr := GetPeerFromTable(msg.ReceivedFrom.String())
+				if gerr != nil {
+					p = Peer{ID: msg.ReceivedFrom.String()}
+				}
+				p.LastSeen = time.Now().Unix()
+				if b, merr := json.Marshal(p); merr == nil {
+					UpdateNodeTableHook(ds.NewKey(msg.ReceivedFrom.String()), b)
+				}
 			}
 		}()
 
@@ -82,7 +92,16 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 		opts.RebroadcastInterval = 5 * time.Second
 		opts.PutHook = func(k ds.Key, v []byte) {
 			fmt.Printf("Added: [%s] -> %s\n", k, string(v))
-			UpdateNodeTableHook(k, v)
+			var peer Peer
+			err := json.Unmarshal(v, &peer)
+			common.ReportError(err, "Error while unmarshalling peer")
+			peer.Connected = true
+			value, err := json.Marshal(peer)
+			if err == nil {
+				UpdateNodeTableHook(k, value)
+			} else {
+				common.Logger.Error("Error while marshalling peer", err)
+			}
 		}
 		opts.DeleteHook = func(k ds.Key) {
 			fmt.Printf("Removed: [%s]\n", k)
@@ -105,6 +124,10 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 
 func Reconnect() {
 	mode := viper.GetString("mode")
+	if ipfs == nil {
+		common.Logger.Warn("Reconnect requested but CRDT/IPFS not initialized yet; skipping")
+		return
+	}
 	addsInfo, err := peer.AddrInfosFromP2pAddrs(getDefaultBootstrapPeers(nil, mode)...)
 	common.ReportError(err, "Error while getting bootstrap peers")
 	ipfs.Bootstrap(addsInfo)

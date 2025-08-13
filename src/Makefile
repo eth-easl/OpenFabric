@@ -24,7 +24,10 @@ endif
 
 # Dependency versions
 GOTESTSUM_VERSION ?= 0.4.2
-GOLANGCI_VERSION ?= 1.48.0
+GOLANGCI_VERSION ?= 1.61.0
+# Default flags for golangci-lint
+GOLANGCI_FLAGS ?= --timeout=5m
+LINT_PKGS ?= ./internal/common/... ./entry/... ./bin/...
 
 GOLANG_VERSION ?= 1.14
 
@@ -80,8 +83,7 @@ ifeq (${VERBOSE}, 1)
 	go env
 endif
 	@mkdir -p ${BUILD_DIR}
-	GOARCH=arm64 go build ${GOARGS} -trimpath -tags "${GOTAGS}" -ldflags "${LDFLAGS}" -o ${BUILD_DIR} ./bin...
-	mv ${BUILD_DIR}/bin ${BUILD_DIR}/ocf-arm
+	GOARCH=arm64 go build ${GOARGS} -trimpath -tags "${GOTAGS}" -ldflags "${LDFLAGS}" -o ${BUILD_DIR} ./entry...
 	@${MAKE} post-build
 
 .PHONY: build
@@ -92,8 +94,7 @@ ifeq (${VERBOSE}, 1)
 endif
 
 	@mkdir -p ${BUILD_DIR}
-	go build ${GOARGS} -trimpath -tags "${GOTAGS}" -ldflags "${LDFLAGS}" -o ${BUILD_DIR} ./bin... 
-	mv ${BUILD_DIR}/bin ${BUILD_DIR}/ocf-amd64
+	go build ${GOARGS} -trimpath -tags "${GOTAGS}" -ldflags "${LDFLAGS}" -o ${BUILD_DIR} ./entry... 
 	@${MAKE} post-build
 
 .PHONY: build-release-deps
@@ -113,7 +114,7 @@ post-build-release: ${POST_BUILD_RELEASE_TARGETS}
 build-release: build-release-deps pre-build-release
 build-release: ## Build binaries without debug information
 	@${MAKE} LDFLAGS="-w ${LDFLAGS}" GOARGS="${GOARGS} -trimpath" BUILD_DIR="${BUILD_DIR}/release" build
-
+	mv build/release/entry build/release/ocf-amd64
 	@${MAKE} post-build-release
 
 .PHONY: build-debug-deps
@@ -159,8 +160,12 @@ bin/golangci-lint: bin/golangci-lint-${GOLANGCI_VERSION}
 	@ln -sf golangci-lint-${GOLANGCI_VERSION} bin/golangci-lint
 bin/golangci-lint-${GOLANGCI_VERSION}:
 	@mkdir -p bin
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | BINARY=golangci-lint bash -s -- v${GOLANGCI_VERSION}
+	GOBIN=$(abspath bin) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v${GOLANGCI_VERSION}
 	@mv bin/golangci-lint $@
+
+.PHONY: lint
+lint: bin/golangci-lint ## Run linters
+	GOTOOLCHAIN=go1.23.0 bin/golangci-lint run ${GOLANGCI_FLAGS} ${LINT_PKGS}
 
 release-%: TAG_PREFIX = v
 release-%:

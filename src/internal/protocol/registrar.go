@@ -6,11 +6,57 @@ import (
 	"errors"
 	"ocf/internal/common"
 	"ocf/internal/platform"
+	"sync"
 	"time"
 
 	ds "github.com/ipfs/go-datastore"
 	"github.com/spf13/viper"
 )
+
+// localServices keeps a thread-safe copy of services this node provides
+// so we can re-announce them on reconnects
+var (
+	localServices     []Service
+	localServicesLock = &sync.RWMutex{}
+)
+
+// addLocalService appends (deduped) to localServices
+func addLocalService(svc Service) {
+	localServicesLock.Lock()
+	defer localServicesLock.Unlock()
+	// simple dedupe on Name|Host|Port
+	key := svc.Name + "|" + svc.Host + "|" + svc.Port
+	exists := false
+	for i := range localServices {
+		k := localServices[i].Name + "|" + localServices[i].Host + "|" + localServices[i].Port
+		if k == key {
+			// merge identity groups (dedupe)
+			existing := make(map[string]struct{})
+			for _, id := range localServices[i].IdentityGroup {
+				existing[id] = struct{}{}
+			}
+			for _, id := range svc.IdentityGroup {
+				if _, ok := existing[id]; !ok {
+					localServices[i].IdentityGroup = append(localServices[i].IdentityGroup, id)
+				}
+			}
+			exists = true
+			break
+		}
+	}
+	if !exists {
+		localServices = append(localServices, svc)
+	}
+}
+
+// snapshotLocalServices returns a copy of current local services
+func snapshotLocalServices() []Service {
+	localServicesLock.RLock()
+	defer localServicesLock.RUnlock()
+	out := make([]Service, len(localServices))
+	copy(out, localServices)
+	return out
+}
 
 func RegisterLocalServices() {
 	serviceName := viper.GetString("service.name")
@@ -79,7 +125,9 @@ func provideService(service Service) {
 	ctx := context.Background()
 	store, _ := GetCRDTStore()
 	key := ds.NewKey(host.ID().String())
-	myself.Service = []Service{service}
+	// track locally and publish full set (deduped)
+	addLocalService(service)
+	myself.Service = snapshotLocalServices()
 	if viper.GetString("public-addr") != "" {
 		myself.PublicAddress = viper.GetString("public-addr")
 	}
@@ -101,5 +149,29 @@ func updateMyself() {
 		common.Logger.Warn("Error while updating myself in CRDT store: ", err)
 	} else {
 		common.Logger.Info("Updated myself in CRDT store: ", myself)
+	}
+}
+
+// ReannounceLocalServices re-publishes this node's service entry, used after reconnects
+func ReannounceLocalServices() {
+	host, _ := GetP2PNode(nil)
+	ctx := context.Background()
+	store, _ := GetCRDTStore()
+	key := ds.NewKey(host.ID().String())
+	// refresh hardware and services
+	myself.Hardware.GPUs = platform.GetGPUInfo()
+	myself.Service = snapshotLocalServices()
+	if viper.GetString("public-addr") != "" {
+		myself.PublicAddress = viper.GetString("public-addr")
+	}
+	value, err := json.Marshal(myself)
+	if err != nil {
+		common.Logger.Error("Error marshalling self during reannounce: ", err)
+		return
+	}
+	if err := store.Put(ctx, key, value); err != nil {
+		common.Logger.Warn("Failed to reannounce local services: ", err)
+	} else {
+		common.Logger.Info("Re-announced local services to network")
 	}
 }

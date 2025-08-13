@@ -7,10 +7,9 @@ import (
 	"ocf/internal/common"
 	"ocf/internal/platform"
 	"sync"
+	"time"
 
 	ds "github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/spf13/viper"
 )
 
@@ -49,6 +48,8 @@ type Peer struct {
 	Version           string              `json:"version"`
 	PublicAddress     string              `json:"public_address"`
 	Hardware          common.HardwareSpec `json:"hardware"`
+	Connected         bool                `json:"connected"`
+	Load              []int               `json:"load"`
 }
 
 type PeerWithStatus struct {
@@ -60,27 +61,12 @@ type PeerWithStatus struct {
 type NodeTable map[string]Peer
 
 var dnt *NodeTable
+var tableUpdateSem = make(chan struct{}, 1) // capacity 1 → max 1 goroutine at a time
 
-func GetNodeTable(reachableOnly bool) *NodeTable {
+func GetNodeTable() *NodeTable {
 	dntOnce.Do(func() {
 		dnt = &NodeTable{}
 	})
-	if reachableOnly {
-		host, _ := GetP2PNode(nil)
-		// filter out the nodes that are not connected
-		for _, p := range *dnt {
-			if host.Network().Connectedness(peer.ID(p.ID)) != network.Connected && p.ID != host.ID().String() {
-				// try to dial the peer
-				conn, err := host.Network().DialPeer(context.Background(), peer.ID(p.ID))
-				if err != nil {
-					common.Logger.Info("Peer: ", p.ID, " removed from table: ", err)
-					// delete(*dnt, key)
-				} else {
-					defer conn.Close()
-				}
-			}
-		}
-	}
 	return dnt
 }
 
@@ -133,25 +119,53 @@ func DeleteNodeTable() {
 }
 
 func UpdateNodeTableHook(key ds.Key, value []byte) {
-	table := *GetNodeTable(false)
+	table := *GetNodeTable()
 	var peer Peer
 	err := json.Unmarshal(value, &peer)
 	common.ReportError(err, "Error while unmarshalling peer")
+	// Preserve locally computed connectivity status if we already know this peer
+	tableUpdateSem <- struct{}{}
+	defer func() { <-tableUpdateSem }() // Release on exit
+
+	if existing, ok := table[key.String()]; ok {
+		// If LastSeen is missing in the update, keep the existing one
+		if peer.LastSeen == 0 {
+			peer.LastSeen = existing.LastSeen
+		}
+	}
+	// Always update LastSeen on any CRDT update we receive for that peer
+	peer.LastSeen = time.Now().Unix()
 	table[key.String()] = peer
 }
 
 func DeleteNodeTableHook(key ds.Key) {
-	table := *GetNodeTable(false)
+	table := *GetNodeTable()
+	tableUpdateSem <- struct{}{}
+	defer func() { <-tableUpdateSem }() // Release on exit
 	delete(table, key.String())
 }
 
 func GetPeerFromTable(peerId string) (Peer, error) {
-	table := *GetNodeTable(false)
-	peer, ok := table[peerId]
+	table := *GetNodeTable()
+	tableUpdateSem <- struct{}{}
+	defer func() { <-tableUpdateSem }() // Release on exit
+	peer, ok := table["/"+peerId]
 	if !ok {
 		return Peer{}, errors.New("peer not found")
 	}
 	return peer, nil
+}
+
+func GetConnectedPeers() *NodeTable {
+	var connected = NodeTable{}
+	tableUpdateSem <- struct{}{}
+	defer func() { <-tableUpdateSem }() // Release on exit
+	for id, p := range *GetNodeTable() {
+		if p.Connected {
+			connected[id] = p
+		}
+	}
+	return &connected
 }
 
 func GetService(name string) (Service, error) {
@@ -173,11 +187,15 @@ func GetService(name string) (Service, error) {
 
 func GetAllProviders(serviceName string) ([]Peer, error) {
 	var providers []Peer
-	table := *GetNodeTable(false)
+	table := *GetNodeTable()
+	tableUpdateSem <- struct{}{}
+	defer func() { <-tableUpdateSem }() // Release on exit
 	for _, peer := range table {
-		for _, service := range peer.Service {
-			if service.Name == serviceName {
-				providers = append(providers, peer)
+		if peer.Connected {
+			for _, service := range peer.Service {
+				if service.Name == serviceName {
+					providers = append(providers, peer)
+				}
 			}
 		}
 	}
@@ -195,6 +213,7 @@ func InitializeMyself() {
 	myself = Peer{
 		ID:            host.ID().String(),
 		PublicAddress: viper.GetString("public-addr"),
+		LastSeen:      time.Now().Unix(),
 	}
 	myself.Hardware.GPUs = platform.GetGPUInfo()
 	value, err := json.Marshal(myself)
