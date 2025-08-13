@@ -1416,7 +1416,9 @@ func (store *Datastore) printDAGRec(ctx context.Context, from cid.Cid, depth uin
 
 	fmt.Println(line)
 	for _, l := range nd.Links() {
-		store.printDAGRec(ctx, l.Cid, depth+1, ng, set)
+		if err := store.printDAGRec(ctx, l.Cid, depth+1, ng, set); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1488,7 +1490,9 @@ func (store *Datastore) dotDAGRec(ctx context.Context, w io.Writer, from cid.Cid
 	fmt.Fprintln(w, "}")
 
 	for _, l := range nd.Links() {
-		store.dotDAGRec(ctx, w, l.Cid, depth+1, ng, set)
+		if err := store.dotDAGRec(ctx, w, l.Cid, depth+1, ng, set); err != nil {
+			return err
+		}
 	}
 	return nil
 }

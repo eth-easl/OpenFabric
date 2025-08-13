@@ -137,21 +137,6 @@ func provideService(service Service) {
 	store.Put(ctx, key, value)
 }
 
-func updateMyself() {
-	store, _ := GetCRDTStore()
-	ctx := context.Background()
-	myself.Hardware.GPUs = platform.GetGPUInfo()
-	value, err := json.Marshal(myself)
-	key := ds.NewKey(myself.ID)
-	common.ReportError(err, "Error while marshalling peer")
-	err = store.Put(ctx, key, value)
-	if err != nil {
-		common.Logger.Warn("Error while updating myself in CRDT store: ", err)
-	} else {
-		common.Logger.Info("Updated myself in CRDT store: ", myself)
-	}
-}
-
 // ReannounceLocalServices re-publishes this node's service entry, used after reconnects
 func ReannounceLocalServices() {
 	host, _ := GetP2PNode(nil)

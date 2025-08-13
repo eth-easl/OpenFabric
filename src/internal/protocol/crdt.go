@@ -78,7 +78,9 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 				case <-ctx.Done():
 					return
 				default:
-					topic.Publish(ctx, []byte("ping"))
+					if err := topic.Publish(ctx, []byte("ping")); err != nil {
+						common.Logger.Warn("Error while publishing ping: ", err)
+					}
 					time.Sleep(20 * time.Second)
 				}
 			}

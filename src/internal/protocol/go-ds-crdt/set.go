@@ -538,11 +538,19 @@ func (s *set) putTombs(ctx context.Context, tombs []*pb.Element) error {
 			return err
 		}
 		if v == nil {
-			store.Delete(ctx, valueK)
-			store.Delete(ctx, s.priorityKey(key))
+			if err := store.Delete(ctx, valueK); err != nil {
+				return err
+			}
+			if err := store.Delete(ctx, s.priorityKey(key)); err != nil {
+				return err
+			}
 		} else {
-			store.Put(ctx, valueK, v)
-			s.setPriority(ctx, store, key, p)
+			if err := store.Put(ctx, valueK, v); err != nil {
+				return err
+			}
+			if err := s.setPriority(ctx, store, key, p); err != nil {
+				return err
+			}
 		}
 
 		// Write tomb into store.

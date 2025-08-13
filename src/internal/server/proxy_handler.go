@@ -22,7 +22,9 @@ import (
 )
 
 func ErrorHandler(res http.ResponseWriter, req *http.Request, err error) {
-	res.Write([]byte(fmt.Sprintf("ERROR: %s", err.Error())))
+    if _, werr := res.Write([]byte(fmt.Sprintf("ERROR: %s", err.Error()))); werr != nil {
+        common.Logger.Error("Error writing error response: ", werr)
+    }
 }
 
 // P2P handler for forwarding requests to other peers

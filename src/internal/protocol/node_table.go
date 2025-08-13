@@ -88,7 +88,9 @@ func UpdateNodeTable(peer Peer) {
 	}
 	value, err := json.Marshal(peer)
 	common.ReportError(err, "Error while marshalling peer")
-	store.Put(ctx, key, value)
+	if err := store.Put(ctx, key, value); err != nil {
+		common.Logger.Error("Error while updating node table: ", err)
+	}
 }
 
 func MarkSelfAsBootstrap() {
@@ -104,7 +106,9 @@ func MarkSelfAsBootstrap() {
 		}
 		value, err := json.Marshal(peer)
 		common.ReportError(err, "Error while marshalling peer")
-		store.Put(ctx, key, value)
+		if err := store.Put(ctx, key, value); err != nil {
+			common.Logger.Error("Error while registering bootstrap: ", err)
+		}
 	}
 }
 
@@ -115,7 +119,9 @@ func DeleteNodeTable() {
 	store, _ := GetCRDTStore()
 	key := ds.NewKey(host.ID().String())
 	common.Logger.Info("Removing myself from the network")
-	store.Delete(ctx, key)
+	if err := store.Delete(ctx, key); err != nil {
+		common.Logger.Error("Error while removing myself from the network: ", err)
+	}
 }
 
 func UpdateNodeTableHook(key ds.Key, value []byte) {

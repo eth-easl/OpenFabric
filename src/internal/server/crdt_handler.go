@@ -44,14 +44,20 @@ func getResourceStats(c *gin.Context) {
 
 func updateLocal(c *gin.Context) {
 	var peer protocol.Peer
-	c.BindJSON(&peer)
+    if err := c.BindJSON(&peer); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
 	peer.Connected = true
 	protocol.UpdateNodeTable(peer)
 }
 
 func deleteLocal(c *gin.Context) {
 	var peer protocol.Peer
-	c.BindJSON(&peer)
+    if err := c.BindJSON(&peer); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
 	protocol.DeleteNodeTable()
 }
 
