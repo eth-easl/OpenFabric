@@ -1,1 +1,1 @@
-docker build -f meta/Dockerfile.amd64 -t ghcr.io/xiaozheyao/ocf:amd64-dev . && docker push ghcr.io/xiaozheyao/ocf:amd64-dev
+docker build -f meta/Dockerfile.amd64 -t ghcr.io/researchcomputer/ocf:amd64-latest . && docker push ghcr.io/researchcomputer/ocf:amd64-latest
