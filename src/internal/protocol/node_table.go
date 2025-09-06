@@ -63,7 +63,7 @@ type NodeTable map[string]Peer
 var dnt *NodeTable
 var tableUpdateSem = make(chan struct{}, 1) // capacity 1 → max 1 goroutine at a time
 
-func GetNodeTable() *NodeTable {
+func getNodeTable() *NodeTable {
 	dntOnce.Do(func() {
 		dnt = &NodeTable{}
 	})
@@ -125,7 +125,7 @@ func DeleteNodeTable() {
 }
 
 func UpdateNodeTableHook(key ds.Key, value []byte) {
-	table := *GetNodeTable()
+	table := *getNodeTable()
 	var peer Peer
 	err := json.Unmarshal(value, &peer)
 	common.ReportError(err, "Error while unmarshalling peer")
@@ -145,14 +145,14 @@ func UpdateNodeTableHook(key ds.Key, value []byte) {
 }
 
 func DeleteNodeTableHook(key ds.Key) {
-	table := *GetNodeTable()
+	table := *getNodeTable()
 	tableUpdateSem <- struct{}{}
 	defer func() { <-tableUpdateSem }() // Release on exit
 	delete(table, key.String())
 }
 
 func GetPeerFromTable(peerId string) (Peer, error) {
-	table := *GetNodeTable()
+	table := *getNodeTable()
 	tableUpdateSem <- struct{}{}
 	defer func() { <-tableUpdateSem }() // Release on exit
 	peer, ok := table["/"+peerId]
@@ -166,12 +166,22 @@ func GetConnectedPeers() *NodeTable {
 	var connected = NodeTable{}
 	tableUpdateSem <- struct{}{}
 	defer func() { <-tableUpdateSem }() // Release on exit
-	for id, p := range *GetNodeTable() {
+	for id, p := range *getNodeTable() {
 		if p.Connected {
 			connected[id] = p
 		}
 	}
 	return &connected
+}
+
+func GetAllPeers() *NodeTable {
+	var peers = NodeTable{}
+	tableUpdateSem <- struct{}{}
+	defer func() { <-tableUpdateSem }() // Release on exit
+	for id, p := range *getNodeTable() {
+		peers[id] = p
+	}
+	return &peers
 }
 
 func GetService(name string) (Service, error) {
@@ -193,7 +203,7 @@ func GetService(name string) (Service, error) {
 
 func GetAllProviders(serviceName string) ([]Peer, error) {
 	var providers []Peer
-	table := *GetNodeTable()
+	table := *getNodeTable()
 	tableUpdateSem <- struct{}{}
 	defer func() { <-tableUpdateSem }() // Release on exit
 	for _, peer := range table {

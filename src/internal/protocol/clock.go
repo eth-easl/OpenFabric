@@ -96,7 +96,7 @@ func StartTicker() {
 		// Cleanup: remove peers that have been disconnected for a long time
 		// Define staleness threshold
 		staleAfter := 10 * time.Minute
-		table := *GetNodeTable()
+		table := *GetAllPeers()
 		now := time.Now().Unix()
 		for id, p := range table {
 			if !p.Connected && p.LastSeen > 0 {

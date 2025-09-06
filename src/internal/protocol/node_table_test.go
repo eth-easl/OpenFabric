@@ -8,7 +8,7 @@ import (
 )
 
 func TestUpdateNodeTableHookAndGetPeer(t *testing.T) {
-	_ = GetNodeTable()
+	_ = GetAllPeers()
 	p := Peer{ID: "peer1", PublicAddress: "1.2.3.4"}
 	b, _ := json.Marshal(p)
 	UpdateNodeTableHook(ds.NewKey("peer1"), b)
@@ -23,7 +23,7 @@ func TestUpdateNodeTableHookAndGetPeer(t *testing.T) {
 }
 
 func TestDeleteNodeTableHook(t *testing.T) {
-	table := GetNodeTable()
+	table := GetAllPeers()
 	p := Peer{ID: "peer2", PublicAddress: "5.6.7.8"}
 	b, _ := json.Marshal(p)
 	UpdateNodeTableHook(ds.NewKey("peer2"), b)
