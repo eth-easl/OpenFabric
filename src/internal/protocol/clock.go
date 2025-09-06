@@ -20,11 +20,7 @@ var verificationProb = 0.5
 
 func StartTicker() {
 	err := gocron.Every(1).Minute().Do(func() {
-		common.Logger.Info("Starting verification")
 		if rand.Float64() < verificationProb {
-			// store, _ := GetCRDTStore()
-			// ctx := context.Background()
-			// store.Put(ctx, ds.NewKey(verificationKey), []byte("verification"))
 			Reconnect()
 		}
 	})
@@ -33,6 +29,8 @@ func StartTicker() {
 		host, _ := GetP2PNode(nil)
 		peers := host.Peerstore().Peers()
 		// updateMyself()
+		var reconnected = 0
+		var disconnected = 0
 		for _, peer_id := range peers {
 			// check if peer is still connected
 			p, error := GetPeerFromTable(peer_id.String())
@@ -41,20 +39,21 @@ func StartTicker() {
 					p.Connected = true
 				} else if peer_id != host.ID() && host.Network().Connectedness(peer_id) != network.Connected {
 					// try to dial the peer, if cannot dial, then mark it as disconnected
-					common.Logger.Info("Dialing ", peer_id.String(), "...")
 					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 					defer cancel()
 					addrInfo := libpeer.AddrInfo{ID: peer_id, Addrs: host.Peerstore().Addrs(peer_id)}
 					if len(addrInfo.Addrs) == 0 {
-						common.Logger.Warnf("No known addresses for peer %s; marking disconnected", peer_id)
 						p.Connected = false
+						disconnected++
 					} else if err := host.Connect(ctx, addrInfo); err != nil {
 						common.Logger.With("err", err).Warnf("Failed to dial peer %s; marking disconnected", peer_id)
 						p.Connected = false
+						disconnected++
 					} else {
 						// Successfully reconnected
 						common.Logger.Infof("Reconnected to peer %s", peer_id)
 						p.Connected = true
+						reconnected++
 					}
 				}
 				// update last seen timestamp
@@ -72,8 +71,9 @@ func StartTicker() {
 			// exit myself
 			os.Exit(1)
 		}
+		common.Logger.Infof("Verification Summary: %d un-reachable peers, %d re-connected peers", disconnected, reconnected)
 	})
-	common.ReportError(err, "Error while creating cleaning ticker")
+	common.ReportError(err, "Error while creating verification ticker")
 
 	// Add resource monitoring every 2 minutes
 	err = gocron.Every(2).Minutes().Do(func() {
@@ -123,6 +123,6 @@ func StartTicker() {
 			}
 		}
 	})
-	common.ReportError(err, "Error while creating resource monitoring ticker")
+	common.ReportError(err, "Error while creating resource monitoring and clean-up ticker")
 	<-gocron.Start()
 }
