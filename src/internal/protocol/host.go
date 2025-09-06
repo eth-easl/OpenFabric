@@ -1,8 +1,11 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	mrand "math/rand"
 	"ocf/internal/common"
@@ -20,10 +23,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/spf13/viper"
 )
 
@@ -31,6 +36,10 @@ var P2PNode *host.Host
 var ddht *dualdht.DHT
 var hostOnce sync.Once
 var MyID string
+
+const (
+	Version = "0.0.0-dev.0"
+)
 
 func GetP2PNode(ds datastore.Batching) (host.Host, dualdht.DHT) {
 	hostOnce.Do(func() {
@@ -82,16 +91,29 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 		return nil, err
 	}
 
+	hash := sha256.Sum256([]byte(Version))
+	keyHex := hex.EncodeToString(hash[:])
+
+	var buf bytes.Buffer
+	buf.WriteString("/key/swarm/psk/1.0.0/\n")
+	buf.WriteString("/base16/\n")
+	buf.WriteString(keyHex + "\n")
+
+	psk, err := pnet.DecodeV1PSK(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		panic(err)
+	}
+
 	opts := []libp2p.Option{
-		libp2p.DefaultTransports,
+		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Identity(priv),
+		libp2p.PrivateNetwork(psk),
 		libp2p.ResourceManager(&network.NullResourceManager{}),
 		// libp2p.ConnectionManager(connmgr),
 		libp2p.NATPortMap(),
 		libp2p.ListenAddrStrings(
 			"/ip4/0.0.0.0/tcp/"+viper.GetString("tcpport"),
 			"/ip4/0.0.0.0/tcp/"+viper.GetString("tcpport")+"/ws",
-			"/ip4/0.0.0.0/udp/"+viper.GetString("udpport")+"/quic",
 		),
 		libp2p.Security(libp2ptls.ID, libp2ptls.New),
 		libp2p.Security(noise.ID, noise.New),
@@ -126,6 +148,9 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 				p, err := GetPeerFromTable(pid.String())
 				if err != nil {
 					p = Peer{ID: pid.String()}
+					common.Logger.Infof("Adding peer: [%s] triggered by new connection", pid.String())
+				} else {
+					common.Logger.Infof("Updating peer: [%s] triggered by new connection", pid.String())
 				}
 				p.Connected = true
 				p.LastSeen = time.Now().Unix()
@@ -148,6 +173,7 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 					p = Peer{ID: pid.String()}
 				}
 				p.Connected = false
+				common.Logger.Infof("Removing peer: [%s] triggered by disconnection", pid.String())
 				// keep LastSeen as last known good; do not bump here
 				if b, e := json.Marshal(p); e == nil {
 					UpdateNodeTableHook(datastore.NewKey(pid.String()), b)

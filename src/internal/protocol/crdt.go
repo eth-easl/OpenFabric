@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"ocf/internal/common"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,8 +65,12 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 				p, gerr := GetPeerFromTable(msg.ReceivedFrom.String())
 				if gerr != nil {
 					p = Peer{ID: msg.ReceivedFrom.String()}
+					common.Logger.Infof("Adding peer: [%s] triggered by msg received", msg.ReceivedFrom.String())
+				} else {
+					common.Logger.Infof("Updating peer: [%s] triggered by msg received", msg.ReceivedFrom.String())
 				}
 				p.LastSeen = time.Now().Unix()
+				p.Connected = true
 				if b, merr := json.Marshal(p); merr == nil {
 					UpdateNodeTableHook(ds.NewKey(msg.ReceivedFrom.String()), b)
 				}
@@ -93,11 +98,25 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 		opts.Logger = common.Logger
 		opts.RebroadcastInterval = 5 * time.Second
 		opts.PutHook = func(k ds.Key, v []byte) {
-			fmt.Printf("Added: [%s] -> %s\n", k, string(v))
 			var peer Peer
 			err := json.Unmarshal(v, &peer)
 			common.ReportError(err, "Error while unmarshalling peer")
-			peer.Connected = true
+			// When a new peer is added to the table it is marked as diconnected by default.
+			// Doing so allows to intercept ghost peers by the verification procedure.
+
+			// Do not update itself
+			host, _ := GetP2PNode(nil)
+			if strings.Trim(k.String(), "/") == host.ID().String() {
+				return
+			}
+			p, err := GetPeerFromTable(strings.Trim(k.String(), "/"))
+			if err != nil {
+				peer.Connected = false
+				common.Logger.Infof("Adding peer: [%s] triggered by p2p hook", strings.Trim(k.String(), "/"))
+			} else {
+				peer.Connected = p.Connected
+				common.Logger.Infof("Updating peer: [%s] triggered by p2p hook", strings.Trim(k.String(), "/"))
+			}
 			value, err := json.Marshal(peer)
 			if err == nil {
 				UpdateNodeTableHook(k, value)
@@ -106,7 +125,7 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 			}
 		}
 		opts.DeleteHook = func(k ds.Key) {
-			fmt.Printf("Removed: [%s]\n", k)
+			common.Logger.Infof("Removed: [%s] triggered by p2p hook", strings.Trim(k.String(), "/"))
 			DeleteNodeTableHook(k)
 		}
 

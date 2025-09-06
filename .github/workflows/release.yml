@@ -6,6 +6,37 @@ on:
       - 'v*'   # Run when pushing a version tag like v1.0.0
 
 jobs:
+  burn-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get release version
+        id: get_version
+        run: |
+          echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Checkout release tag
+        run: |
+          git checkout tags/${{ env.RELEASE_TAG }} -b release-version-update
+
+      - name: Update version in code
+        run: |
+          # Replace in a specific file — adjust pattern and file path
+          sed -i "s/0\.0\.0-dev\.0/${{ env.RELEASE_TAG }}/g" src/internal/protocol/host.go
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/internal/protocol/host.go
+          git commit -m "Update version to ${{ env.RELEASE_TAG }}"
+          git tag -d ${{ env.RELEASE_TAG }}
+          git tag -f ${{ env.RELEASE_TAG }}
+          git push --force origin refs/tags/${{ env.RELEASE_TAG }}
   build:
     name: Build Go Binary
     runs-on: ubuntu-latest
@@ -13,6 +44,16 @@ jobs:
     steps:
       - name: Check out source code
         uses: actions/checkout@v4
+
+      - name: Get release version
+        id: get_version
+        run: |
+          echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Checkout release tag
+        run: |
+          git fetch --tags --all --force
+          git checkout tags/${{ env.RELEASE_TAG }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -23,9 +64,9 @@ jobs:
       - name: Build production binary
         run: |
           cd src
-          GOOS=linux GOARCH=amd64 go build -trimpath -tags "" -ldflags "-X main.version=${VERSION} -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${BUILD_DATE} -X main.authUrl=$(AUTH_URL) -X main.authClientId=$(AUTH_CLIENT_ID) -X main.authSecret=$(AUTH_CLIENT_SECRET) -X main.sentryDSN=$(SENTRY_DSN)" -o ./build/release/ ./entry...
+          GOOS=linux GOARCH=amd64 GIN_MODE=release go build -trimpath -tags "" -ldflags "-X main.version=${VERSION} -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${BUILD_DATE} -X main.authUrl=$(AUTH_URL) -X main.authClientId=$(AUTH_CLIENT_ID) -X main.authSecret=$(AUTH_CLIENT_SECRET) -X main.sentryDSN=$(SENTRY_DSN)" -o ./build/release/ ./entry...
           mv build/release/entry build/release/ocf-amd64
-          GOOS=linux GOARCH=arm64 go build -trimpath -tags "" -ldflags "-X main.version=${VERSION} -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${BUILD_DATE} -X main.authUrl=$(AUTH_URL) -X main.authClientId=$(AUTH_CLIENT_ID) -X main.authSecret=$(AUTH_CLIENT_SECRET) -X main.sentryDSN=$(SENTRY_DSN)" -o ./build/release/ ./entry...
+          GOOS=linux GOARCH=arm64 GIN_MODE=release go build -trimpath -tags "" -ldflags "-X main.version=${VERSION} -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${BUILD_DATE} -X main.authUrl=$(AUTH_URL) -X main.authClientId=$(AUTH_CLIENT_ID) -X main.authSecret=$(AUTH_CLIENT_SECRET) -X main.sentryDSN=$(SENTRY_DSN)" -o ./build/release/ ./entry...
           mv build/release/entry build/release/ocf-arm64
 
 

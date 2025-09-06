@@ -8,7 +8,7 @@ networks:
 
 services:
   global-dispatcher:
-    image: ocf-amd64
+    image: ocf-amd64:latest
     build:
       context: ../
       dockerfile: ./local-demo/docker/dispatcher/Dockerfile
@@ -31,10 +31,14 @@ services:
       - 8092:8092
       - 43905:43905
   llm-srevice-1:
-    image: ocf-sql-amd64
+    image: ocf-sql-amd64:latest
     build:
       context: ../
       dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+      args:
+        OCF_IMAGE: ocf-amd64:latest
+    depends_on:
+      - global-dispatcher
     command:
       [
         "start",
@@ -58,10 +62,9 @@ services:
       - 8093:8092
       - 43906:43905
   llm-srevice-2:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",
@@ -82,10 +85,9 @@ services:
       - 43907:43905
 
   llm-srevice-3:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",
@@ -106,10 +108,9 @@ services:
       - 43908:43905
 
   llm-srevice-4:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",
@@ -130,10 +131,9 @@ services:
       - 43910:43905
 
   llm-srevice-5:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",
@@ -154,10 +154,9 @@ services:
       - 43911:43905
 
   llm-srevice-6:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",
@@ -178,10 +177,9 @@ services:
       - 43912:43905
   
   llm-srevice-7:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",
@@ -202,10 +200,9 @@ services:
       - 43913:43905
   
   llm-srevice-8:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",
@@ -226,10 +223,9 @@ services:
       - 43914:43905
 
   llm-srevice-9:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",
@@ -250,10 +246,9 @@ services:
       - 43915:43905
 
   llm-srevice-0:
-    image: ocf-sql-amd64
-    build:
-      context: ../
-      dockerfile: ./local-demo/docker/llm-serving/Dockerfile
+    image: ocf-sql-amd64:latest
+    depends_on:
+      - llm-srevice-1
     command:
       [
         "start",

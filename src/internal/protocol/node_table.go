@@ -103,6 +103,7 @@ func MarkSelfAsBootstrap() {
 		peer := Peer{
 			ID:            host.ID().String(),
 			PublicAddress: viper.GetString("public-addr"),
+			Connected:     true,
 		}
 		value, err := json.Marshal(peer)
 		common.ReportError(err, "Error while marshalling peer")
@@ -132,7 +133,6 @@ func UpdateNodeTableHook(key ds.Key, value []byte) {
 	// Preserve locally computed connectivity status if we already know this peer
 	tableUpdateSem <- struct{}{}
 	defer func() { <-tableUpdateSem }() // Release on exit
-
 	if existing, ok := table[key.String()]; ok {
 		// If LastSeen is missing in the update, keep the existing one
 		if peer.LastSeen == 0 {
@@ -230,6 +230,7 @@ func InitializeMyself() {
 		ID:            host.ID().String(),
 		PublicAddress: viper.GetString("public-addr"),
 		LastSeen:      time.Now().Unix(),
+		Connected:     true,
 	}
 	myself.Hardware.GPUs = platform.GetGPUInfo()
 	value, err := json.Marshal(myself)
