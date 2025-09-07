@@ -133,6 +133,7 @@ func provideService(service Service) {
 	}
 	common.Logger.Info("Registering LLM service: ", myself)
 	value, err := json.Marshal(myself)
+	UpdateNodeTableHook(key, value)
 	common.ReportError(err, "Error while marshalling peer")
 	err = store.Put(ctx, key, value)
 	if err != nil {
@@ -157,6 +158,7 @@ func ReannounceLocalServices() {
 		common.Logger.Error("Error marshalling self during reannounce: ", err)
 		return
 	}
+	UpdateNodeTableHook(key, value)
 	if err := store.Put(ctx, key, value); err != nil {
 		common.Logger.Warn("Failed to reannounce local services: ", err)
 	} else {

@@ -106,6 +106,7 @@ func MarkSelfAsBootstrap() {
 			Connected:     true,
 		}
 		value, err := json.Marshal(peer)
+		UpdateNodeTableHook(key, value)
 		common.ReportError(err, "Error while marshalling peer")
 		if err := store.Put(ctx, key, value); err != nil {
 			common.Logger.Error("Error while registering bootstrap: ", err)
