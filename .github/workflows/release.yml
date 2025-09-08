@@ -83,12 +83,14 @@ jobs:
   publish-docker-images:
     runs-on: ubuntu-24.04
     needs: build
+    env:
+      REGISTRY: ghcr.io
     strategy:
       fail-fast: false
       matrix:
         include:
           - dockerfile: ./docker/dispatcher/Dockerfile
-            image: ghcr.io/researchcomputer/ocf:amd64-latest
+            image: researchcomputer/ocf:amd64-latest
     permissions:
       contents: read
       packages: write
