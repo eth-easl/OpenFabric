@@ -89,8 +89,7 @@ jobs:
         include:
           - dockerfile: ./docker/dispatcher/Dockerfile
             image: ghcr.io/researchcomputer/ocf:amd64-latest
-    
-permissions:
+    permissions:
       contents: read
       packages: write
       # This is used to complete the identity challenge
