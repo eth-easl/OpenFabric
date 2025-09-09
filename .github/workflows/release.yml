@@ -91,6 +91,8 @@ jobs:
         include:
           - dockerfile: ./docker/dispatcher/Dockerfile
             image: researchcomputer/ocf
+            platform: linux/amd64
+
     permissions:
       contents: read
       packages: write
