@@ -6,9 +6,9 @@ import starlightThemeFlexoki from 'starlight-theme-flexoki'
 export default defineConfig({
 	integrations: [
 		starlight({
-			title: 'Open Compute Framework',
+			title: 'Research Computer',
 			plugins: [starlightThemeFlexoki()],
-			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/researchcomputer/OpenComputeFramework' }],
+			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/researchcomputer' }],
 			sidebar: [
 				{
 					label: 'Guides',
@@ -17,16 +17,22 @@ export default defineConfig({
 						{ label: 'ML Inference', link: '/guides/ml_inference/' },
 						{ label: 'Deployment', link: '/guides/spinup/' },
 					],
-					},
-					{
-						label: 'Reference',
-						items: [
-							{ label: 'Architecture', link: '/reference/architecture/' },
-							{ label: 'CLI', link: '/reference/cli/' },
-							{ label: 'API', link: '/reference/api/' },
-							{ label: 'Configuration', link: '/reference/configuration/' },
-						],
-					}
+				},
+				{
+					label: 'LLM Serving',
+					items: [
+						{ label: "Simulator", link: "/llm/simulator" },
+					],
+				},
+				{
+					label: 'Reference',
+					items: [
+						{ label: 'Architecture', link: '/reference/architecture/' },
+						{ label: 'CLI', link: '/reference/cli/' },
+						{ label: 'API', link: '/reference/api/' },
+						{ label: 'Configuration', link: '/reference/configuration/' },
+					],
+				}
 
 			],
 		}),
