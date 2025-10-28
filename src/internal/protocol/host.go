@@ -112,6 +112,7 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 		libp2p.ListenAddrStrings(
 			"/ip4/0.0.0.0/tcp/"+viper.GetString("tcpport"),
 			"/ip4/0.0.0.0/tcp/"+viper.GetString("tcpport")+"/ws",
+			"/ip4/0.0.0.0/udp/"+viper.GetString("udpport")+"/quic",
 		),
 		libp2p.Security(libp2ptls.ID, libp2ptls.New),
 		libp2p.Security(noise.ID, noise.New),
