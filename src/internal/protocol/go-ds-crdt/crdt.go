@@ -809,9 +809,9 @@ func (store *Datastore) processNode(ctx context.Context, ng *crdtNodeGetter, roo
 
 	// Some informative logging
 	if prio := delta.GetPriority(); prio%50 == 0 {
-		store.logger.Infof("merged delta from node %s (priority: %d)", current, prio)
+		common.Logger.Infof("merged delta from node %s (priority: %d)", current, prio)
 	} else {
-		store.logger.Debugf("merged delta from node %s (priority: %d)", current, prio)
+		common.Logger.Debugf("merged delta from node %s (priority: %d)", current, prio)
 	}
 
 	links := node.Links()

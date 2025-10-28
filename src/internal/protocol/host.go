@@ -23,7 +23,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/pnet"
 	"github.com/libp2p/go-libp2p/core/routing"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
@@ -99,15 +98,15 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 	buf.WriteString("/base16/\n")
 	buf.WriteString(keyHex + "\n")
 
-	psk, err := pnet.DecodeV1PSK(bytes.NewReader(buf.Bytes()))
-	if err != nil {
-		panic(err)
-	}
+	// psk, err := pnet.DecodeV1PSK(bytes.NewReader(buf.Bytes()))
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	opts := []libp2p.Option{
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Identity(priv),
-		libp2p.PrivateNetwork(psk),
+		// libp2p.PrivateNetwork(psk),
 		libp2p.ResourceManager(&network.NullResourceManager{}),
 		// libp2p.ConnectionManager(connmgr),
 		libp2p.NATPortMap(),
@@ -120,6 +119,8 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 		libp2p.EnableNATService(),
 		libp2p.EnableRelay(),
 		libp2p.EnableHolePunching(),
+		libp2p.EnableAutoNATv2(),
+		libp2p.EnableRelayService(),
 		libp2p.ForceReachabilityPublic(),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			ddht, err = newDHT(ctx, h, ds)
