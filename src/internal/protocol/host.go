@@ -27,7 +27,6 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
-	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/spf13/viper"
 )
 
@@ -104,7 +103,7 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 	// }
 
 	opts := []libp2p.Option{
-		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.DefaultTransports,
 		libp2p.Identity(priv),
 		// libp2p.PrivateNetwork(psk),
 		libp2p.ResourceManager(&network.NullResourceManager{}),
