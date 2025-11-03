@@ -6,6 +6,7 @@ import (
 	"errors"
 	"ocf/internal/common"
 	"ocf/internal/platform"
+	"ocf/internal/wallet"
 	"sync"
 	"time"
 
@@ -82,6 +83,10 @@ func UpdateNodeTable(peer Peer) {
 	existingPeer, err := GetPeerFromTable(peer.ID)
 	if err == nil {
 		peer.Service = append(peer.Service, existingPeer.Service...)
+		// Preserve existing provider if not set in the update
+		if peer.Owner == "" && existingPeer.Owner != "" {
+			peer.Owner = existingPeer.Owner
+		}
 	}
 	if viper.GetString("public-addr") != "" {
 		peer.PublicAddress = viper.GetString("public-addr")
@@ -222,7 +227,7 @@ func GetAllProviders(serviceName string) ([]Peer, error) {
 	return providers, nil
 }
 
-func InitializeMyself() {
+func InitializeMyself(ownerOverride string) {
 	host, _ := GetP2PNode(nil)
 	ctx := context.Background()
 	store, _ := GetCRDTStore()
@@ -233,6 +238,21 @@ func InitializeMyself() {
 		LastSeen:      time.Now().Unix(),
 		Connected:     true,
 	}
+
+	// Add wallet address as provider if available
+	if ownerOverride != "" {
+		myself.Owner = ownerOverride
+		common.Logger.Infof("Using verified wallet account for provider: %s", myself.Owner)
+	} else if account := viper.GetString("wallet.account"); account != "" {
+		myself.Owner = account
+		common.Logger.Infof("Using configured wallet account for provider: %s", myself.Owner)
+	} else if wm, err := wallet.InitializeWallet(); err == nil && wm.WalletExists() {
+		myself.Owner = wm.GetPublicKey()
+		if myself.Owner != "" {
+			common.Logger.Infof("Added wallet address as provider: %s", myself.Owner)
+		}
+	}
+
 	myself.Hardware.GPUs = platform.GetGPUInfo()
 	value, err := json.Marshal(myself)
 	common.ReportError(err, "Error while marshalling peer")

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -34,7 +35,10 @@ func init() {
 	rootcmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/ocf/cfg.yaml)")
 
 	startCmd.Flags().String("wallet.account", "", "wallet account")
+	startCmd.Flags().String("account.wallet", "", "path to wallet key file")
 	startCmd.Flags().String("bootstrap.addr", "http://152.67.71.5:8092/v1/dnt/bootstraps", "bootstrap address")
+	startCmd.Flags().StringSlice("bootstrap.source", nil, "bootstrap source (HTTP URL, dnsaddr://host, or multiaddr). Repeatable")
+	startCmd.Flags().StringSlice("bootstrap.static", nil, "static bootstrap multiaddr (repeatable)")
 	startCmd.Flags().String("seed", "0", "Seed")
 	startCmd.Flags().String("mode", "node", "Mode (standalone, local, full)")
 	startCmd.Flags().String("tcpport", "43905", "TCP Port")
@@ -43,6 +47,9 @@ func init() {
 	startCmd.Flags().String("public-addr", "", "Public address if you have one (by setting this, you can be a bootstrap node)")
 	startCmd.Flags().String("service.name", "", "Service name")
 	startCmd.Flags().String("service.port", "", "Service port")
+	startCmd.Flags().String("solana.rpc", defaultConfig.Solana.RPC, "Solana RPC endpoint")
+	startCmd.Flags().String("solana.mint", defaultConfig.Solana.Mint, "SPL token mint to verify ownership")
+	startCmd.Flags().Bool("solana.skip_verification", defaultConfig.Solana.SkipVerification, "Skip Solana token ownership verification (use for testing only)")
 	startCmd.Flags().Bool("cleanslate", true, "Clean slate")
 	rootcmd.AddCommand(initCmd)
 	rootcmd.AddCommand(startCmd)
@@ -53,6 +60,10 @@ func init() {
 func initConfig(cmd *cobra.Command) error {
 	var home string
 	var err error
+
+	viper.SetDefault("crdt.tombstone_retention", "24h")
+	viper.SetDefault("crdt.tombstone_compaction_interval", "1h")
+	viper.SetDefault("crdt.tombstone_compaction_batch", 512)
 	// Don't forget to read config either from cfgFile or from home directory!
 	if cfgFile != "" {
 		// Use config file from the flag.
@@ -77,6 +88,11 @@ func initConfig(cmd *cobra.Command) error {
 		viper.SetDefault("udpport", defaultConfig.UDPPort)
 		viper.SetDefault("vacuum.interval", defaultConfig.Vacuum.Interval)
 		viper.SetDefault("queue.port", defaultConfig.Queue.Port)
+		viper.SetDefault("account.wallet", defaultConfig.Account.Wallet)
+		viper.SetDefault("wallet.account", "")
+		viper.SetDefault("solana.rpc", defaultConfig.Solana.RPC)
+		viper.SetDefault("solana.mint", defaultConfig.Solana.Mint)
+		viper.SetDefault("solana.skip_verification", defaultConfig.Solana.SkipVerification)
 		configPath := path.Join(home, ".config", "ocf", "cfg.yaml")
 		err = os.MkdirAll(path.Dir(configPath), os.ModePerm)
 		if err != nil {
@@ -110,6 +126,12 @@ func initConfig(cmd *cobra.Command) error {
 					viper.Set(flag.Name, flag.Value)
 				} else {
 					viper.Set(flag.Name, value)
+				}
+			case "stringSlice", "stringArray":
+				if sliceValue, ok := flag.Value.(pflag.SliceValue); ok {
+					viper.Set(flag.Name, sliceValue.GetSlice())
+				} else {
+					viper.Set(flag.Name, strings.Split(flag.Value.String(), ","))
 				}
 			default:
 				viper.Set(flag.Name, flag.Value)

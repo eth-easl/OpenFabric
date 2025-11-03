@@ -6,6 +6,8 @@ import (
 	"ocf/internal/common"
 	"ocf/internal/common/process"
 	"ocf/internal/protocol"
+	solanaclient "ocf/internal/solana"
+	"ocf/internal/wallet"
 	"os/signal"
 	"syscall"
 	"time"
@@ -15,7 +17,66 @@ import (
 )
 
 func StartServer() {
-	protocol.InitializeMyself()
+	walletManager, err := wallet.InitializeWallet()
+	if err != nil {
+		common.Logger.Fatalf("Failed to initialize wallet: %v", err)
+	}
+	walletPublicKey := walletManager.GetPublicKey()
+	common.Logger.Infof("Server wallet initialized. Public key: %s", walletPublicKey)
+
+	if walletPublicKey == "" {
+		common.Logger.Fatal("No wallet public key available; ensure an account is created with `ocf wallet create`")
+	}
+
+	if viper.GetString("wallet.account") == "" {
+		viper.Set("wallet.account", walletPublicKey)
+	}
+	if walletPath := walletManager.GetWalletPath(); walletPath != "" && viper.GetString("account.wallet") == "" {
+		viper.Set("account.wallet", walletPath)
+	}
+
+	walletType := walletManager.GetWalletType()
+	if walletType == wallet.WalletTypeSolana {
+		common.Logger.Info("Wallet type: solana")
+	} else {
+		common.Logger.Info("Wallet type: ocf")
+	}
+
+	configuredAccount := viper.GetString("wallet.account")
+	if configuredAccount != "" && configuredAccount != walletPublicKey {
+		common.Logger.Fatalf("Configured wallet.account (%s) does not match local wallet public key (%s)", configuredAccount, walletPublicKey)
+	}
+	if configuredAccount != "" {
+		common.Logger.Infof("Verified configured wallet.account matches local wallet")
+	}
+
+	owner := walletPublicKey
+	if configuredAccount != "" {
+		owner = configuredAccount
+	}
+
+	if walletType == wallet.WalletTypeSolana {
+		mint := viper.GetString("solana.mint")
+		skipVerification := viper.GetBool("solana.skip_verification")
+		if mint != "" && !skipVerification {
+			rpcEndpoint := viper.GetString("solana.rpc")
+			client := solanaclient.NewClient(rpcEndpoint)
+			verifyCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			hasToken, err := client.HasSPLToken(verifyCtx, owner, mint)
+			cancel()
+			if err != nil {
+				common.Logger.Fatalf("Failed to verify SPL token ownership: %v", err)
+			}
+			if !hasToken {
+				common.Logger.Fatalf("Solana wallet %s does not hold SPL mint %s", owner, mint)
+			}
+			common.Logger.Infof("Verified SPL token ownership for mint %s", mint)
+		} else if mint != "" && skipVerification {
+			common.Logger.Warn("Skipping Solana token ownership verification as requested")
+		}
+	}
+
+	protocol.InitializeMyself(owner)
 	_, cancelCtx := protocol.GetCRDTStore()
 	defer cancelCtx()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
@@ -26,6 +87,16 @@ func StartServer() {
 	r := gin.Default()
 	r.Use(corsHeader())
 	r.Use(gin.Recovery())
+	// Initialize OpenAPI/Swagger documentation
+	r.GET("/openapi.yaml", func(c *gin.Context) {
+		c.Header("Content-Type", "application/yaml")
+		c.File("./internal/server/openapi.yaml")
+	})
+	r.GET("/swagger", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "swagger.html", gin.H{
+			"openapiUrl": "/openapi.yaml",
+		})
+	})
 
 	go protocol.StartTicker()
 	subProcess := viper.GetString("subprocess")

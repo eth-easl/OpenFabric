@@ -20,6 +20,7 @@ type Config struct {
 	Vacuum  VaccumConfig  `json:"vacuum" yaml:"vacuum"`
 	Queue   QueueConfig   `json:"queue" yaml:"queue"`
 	Account AccountConfig `json:"account" yaml:"account"`
+	Solana  SolanaConfig  `json:"solana" yaml:"solana"`
 	Seed    string        `json:"seed" yaml:"seed"`
 	TCPPort string        `json:"tcp_port" yaml:"tcp_port"`
 	UDPPort string        `json:"udp_port" yaml:"udp_port"`
@@ -27,6 +28,12 @@ type Config struct {
 
 type AccountConfig struct {
 	Wallet string `json:"wallet" yaml:"wallet"`
+}
+
+type SolanaConfig struct {
+	RPC              string `json:"rpc" yaml:"rpc"`
+	Mint             string `json:"mint" yaml:"mint"`
+	SkipVerification bool   `json:"skip_verification" yaml:"skip_verification"`
 }
 
 var defaultConfig = Config{
@@ -40,4 +47,5 @@ var defaultConfig = Config{
 	Vacuum:  VaccumConfig{Interval: 10},
 	Queue:   QueueConfig{Port: "8094"},
 	Account: AccountConfig{Wallet: ""},
+	Solana:  SolanaConfig{RPC: "https://api.mainnet-beta.solana.com", Mint: "EsmcTrdLkFqV3mv4CjLF3AmCx132ixfFSYYRWD78cDzR", SkipVerification: false},
 }

@@ -1,0 +1,567 @@
+openapi: 3.0.3
+info:
+  title: OpenComputeFramework API
+  description: API documentation for the OpenComputeFramework service registry and P2P network
+  version: 1.0.0
+servers:
+  - url: http://localhost:8092
+    description: Local development server
+  - url: https://api.ocf.example.com
+    description: Production server
+
+paths:
+  /v1/health:
+    get:
+      summary: Check server health
+      description: Returns a simple health status check
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+      tags:
+        - Health
+
+  /v1/dnt/table:
+    get:
+      summary: Get node table
+      description: Retrieve the current distributed node table
+      responses:
+        '200':
+          description: Node table retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    value:
+                      type: string
+                    latency:
+                      type: number
+                    privileged:
+                      type: boolean
+                    owner:
+                      type: string
+                    current_offering:
+                      type: string
+                    role:
+                      type: string
+                    status:
+                      type: string
+                    available_offering:
+                      type: string
+                    service:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          status:
+                            type: string
+                          host:
+                            type: string
+                          port:
+                            type: string
+                          identity_group:
+                            type: array
+                            items:
+                              type: string
+                          version:
+                            type: string
+                    last_seen:
+                      type: string
+                    version:
+                      type: string
+      tags:
+        - DNT
+
+  /v1/dnt/peers:
+    get:
+      summary: List connected peers
+      description: Get a list of all currently connected peers
+      responses:
+        '200':
+          description: Peers list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  peers:
+                    type: array
+                    items:
+                      type: string
+      tags:
+        - DNT
+
+  /v1/dnt/peers_status:
+    get:
+      summary: List peers with status
+      description: Get a list of all peers with their connection status
+      responses:
+        '200':
+          description: Peers with status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  peers:
+                    type: array
+                    items:
+                      type: object
+      tags:
+        - DNT
+
+  /v1/dnt/bootstraps:
+    get:
+      summary: List bootstraps
+      description: Get a list of all connected bootstrap nodes
+      responses:
+        '200':
+          description: Bootstraps list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bootstraps:
+                    type: array
+                    items:
+                      type: string
+      tags:
+        - DNT
+
+  /v1/dnt/stats:
+    get:
+      summary: Get resource statistics
+      description: Retrieve resource usage and connection statistics
+      responses:
+        '200':
+          description: Resource stats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected_peers:
+                    type: integer
+                  total_peers_known:
+                    type: integer
+                  connected_peer_details:
+                    type: array
+                    items:
+                      type: string
+                  all_peer_details:
+                    type: array
+                    items:
+                      type: object
+                  message:
+                    type: string
+      tags:
+        - DNT
+
+  /v1/dnt/_node:
+    post:
+      summary: Update local node
+      description: Update the local node's information in the node table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                value:
+                  type: string
+                latency:
+                  type: number
+                privileged:
+                  type: boolean
+                owner:
+                  type: string
+                current_offering:
+                  type: string
+                role:
+                  type: string
+                status:
+                  type: string
+                available_offering:
+                  type: string
+                service:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      status:
+                        type: string
+                      host:
+                        type: string
+                      port:
+                        type: string
+                      identity_group:
+                        type: array
+                        items:
+                          type: string
+                      version:
+                        type: string
+                last_seen:
+                  type: string
+                version:
+                  type: string
+      responses:
+        '200':
+          description: Node updated successfully
+        '400':
+          description: Invalid request body
+      tags:
+        - DNT
+
+  /v1/dnt/_node:
+    delete:
+      summary: Delete local node
+      description: Remove the local node from the node table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                value:
+                  type: string
+                latency:
+                  type: number
+                privileged:
+                  type: boolean
+                owner:
+                  type: string
+                current_offering:
+                  type: string
+                role:
+                  type: string
+                status:
+                  type: string
+                available_offering:
+                  type: string
+                service:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      status:
+                        type: string
+                      host:
+                        type: string
+                      port:
+                        type: string
+                      identity_group:
+                        type: array
+                        items:
+                          type: string
+                      version:
+                        type: string
+                last_seen:
+                  type: string
+                version:
+                  type: string
+      responses:
+        '200':
+          description: Node deleted successfully
+        '400':
+          description: Invalid request body
+      tags:
+        - DNT
+
+  /v1/p2p/{peerId}/*path:
+    get:
+      summary: Forward request to peer
+      description: Forward an HTTP request to a specific peer in the P2P network
+      parameters:
+        - name: peerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the target peer
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Invalid peer ID or path
+      tags:
+        - P2P
+
+    post:
+      summary: Forward request to peer
+      description: Forward an HTTP request to a specific peer in the P2P network
+      parameters:
+        - name: peerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the target peer
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Invalid peer ID or path
+      tags:
+        - P2P
+
+    patch:
+      summary: Forward request to peer
+      description: Forward an HTTP request to a specific peer in the P2P network
+      parameters:
+        - name: peerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the target peer
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Invalid peer ID or path
+      tags:
+        - P2P
+
+  /v1/service/{service}/*path:
+    get:
+      summary: Forward request to global service
+      description: Forward an HTTP request to a globally registered service
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The name of the service to forward to
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Service not found
+        '404':
+          description: Service provider not available
+      tags:
+        - Service
+
+    post:
+      summary: Forward request to global service
+      description: Forward an HTTP request to a globally registered service
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The name of the service to forward to
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Service not found
+        '404':
+          description: Service provider not available
+      tags:
+        - Service
+
+    patch:
+      summary: Forward request to global service
+      description: Forward an HTTP request to a globally registered service
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The name of the service to forward to
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Service not found
+        '404':
+          description: Service provider not available
+      tags:
+        - Service
+
+  /v1/_service/{service}/*path:
+    get:
+      summary: Forward request to service
+      description: Forward an HTTP request to a registered service
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The name of the service to forward to
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Service not found
+      tags:
+        - Service
+
+    post:
+      summary: Forward request to service
+      description: Forward an HTTP request to a registered service
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The name of the service to forward to
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Service not found
+      tags:
+        - Service
+
+    patch:
+      summary: Forward request to service
+      description: Forward an HTTP request to a registered service
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The name of the service to forward to
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The path to forward the request to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Request forwarded successfully
+        '400':
+          description: Service not found
+      tags:
+        - Service
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

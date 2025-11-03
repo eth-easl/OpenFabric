@@ -84,6 +84,7 @@ pub struct InitTokenParams {
     params: InitTokenParams
 )]
 pub struct InitToken<'info> {
+    /// CHECK: This account is created by the metaplex metadata program
     #[account(mut)]
     pub metadata: UncheckedAccount<'info>,
     #[account(

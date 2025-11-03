@@ -139,6 +139,8 @@ func GetCRDTStore() (*crdt.Datastore, context.CancelFunc) {
 		common.Logger.Info("Mode: ", mode)
 		common.Logger.Info("Peer ID: ", host.ID().String())
 		common.Logger.Info("Listen Addr: ", host.Addrs())
+
+		startTombstoneCompactor(crdtStore)
 	})
 	return crdtStore, cancelSubscriptions
 }

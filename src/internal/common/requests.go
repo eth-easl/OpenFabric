@@ -1,25 +1,39 @@
 package common
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
+// RemoteGET performs a GET request with a short timeout and returns the body
+// or an error if the request fails or returns a non-2xx status code.
 func RemoteGET(url string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
-	var resBody []byte
 	if err != nil {
 		Logger.Error("http client: could not create request: ", err)
+		return nil, err
 	}
-	res, err := http.DefaultClient.Do(req)
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	res, err := client.Do(req)
 	if err != nil {
-		Logger.Error("http client: could not send request: ", err)
-	} else {
-		resBody, err = io.ReadAll(res.Body)
-		// resBody bytes to string
-		if err != nil {
-			Logger.Error("http client: could not read response: ", err)
-		}
+		Logger.Error("http client: request failed: ", err)
+		return nil, err
 	}
-	return resBody, err
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		err = fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		Logger.Error("http client: ", err)
+		return nil, err
+	}
+
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		Logger.Error("http client: could not read response: ", err)
+		return nil, err
+	}
+	return resBody, nil
 }

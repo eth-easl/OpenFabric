@@ -27,6 +27,28 @@ func ErrorHandler(res http.ResponseWriter, req *http.Request, err error) {
     }
 }
 
+// StreamAwareResponseWriter wraps the response writer to handle streaming
+type StreamAwareResponseWriter struct {
+    http.ResponseWriter
+    flusher http.Flusher
+}
+
+func (s *StreamAwareResponseWriter) WriteHeader(statusCode int) {
+    // Enable streaming headers if this is a streaming response
+    if s.ResponseWriter.Header().Get("Content-Type") == "text/event-stream" {
+        s.ResponseWriter.Header().Set("Cache-Control", "no-cache")
+        s.ResponseWriter.Header().Set("Connection", "keep-alive")
+        s.ResponseWriter.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
+    }
+    s.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (s *StreamAwareResponseWriter) Flush() {
+    if s.flusher != nil {
+        s.flusher.Flush()
+    }
+}
+
 // P2P handler for forwarding requests to other peers
 func P2PForwardHandler(c *gin.Context) {
 	// Set a longer timeout for AI/ML services
@@ -109,6 +131,14 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 	// Set a longer timeout for AI/ML services
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Minute)
 	defer cancel()
+
+	// Create a copy of the request body to preserve it for streaming
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	c.Request = c.Request.WithContext(ctx)
 
 	serviceName := c.Param("service")
@@ -118,11 +148,8 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	body, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Use the already read bodyBytes instead of reading again
+	body := bodyBytes
 	// find proper service that are within the same identity group
 	// first filter by service name, then iterative over the identity groups
 	// always find all the services that are in the same identity group
@@ -193,5 +220,12 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 	proxy.Transport = tr
 	proxy.ErrorHandler = ErrorHandler
 	proxy.ModifyResponse = rewriteHeader()
-	proxy.ServeHTTP(c.Writer, c.Request)
+
+	// Wrap the response writer to handle streaming properly
+	streamWriter := &StreamAwareResponseWriter{
+		ResponseWriter: c.Writer,
+		flusher:        c.Writer.(http.Flusher),
+	}
+
+	proxy.ServeHTTP(streamWriter, c.Request)
 }

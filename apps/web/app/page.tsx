@@ -1,21 +1,19 @@
-import FAQ from "@/components/faq";
-import Features from "@/components/features";
-import Footer from "@/components/footer";
-import Hero from "@/components/hero";
-import { Navbar } from "@/components/navbar";
-import Testimonial from "@/components/testimonial";
-import CodeExample from "@/components/code-example";
+'use client'
+
+import { useAccount } from 'wagmi'
+import Hero from '@/components/hero'
+import { Dashboard } from '@/components/dashboard'
 
 export default function Home() {
+  const { isConnected } = useAccount()
+
+  if (isConnected) {
+    return <Dashboard />
+  }
+
   return (
     <>
-      <Navbar />
       <Hero />
-      <Features />
-      <CodeExample />
-      <FAQ />
-      <Testimonial />
-      <Footer />
     </>
-  );
+  )
 }

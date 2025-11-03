@@ -112,9 +112,9 @@ const AnimatedGlobe = () => {
 
       // Transform points with rotation and 45-degree tilt
       const rotatedPoints = points.map((point) => {
-        let x = point.x * Math.cos(rotationRef.current) - point.z * Math.sin(rotationRef.current);
-        let y = point.y;
-        let z = point.x * Math.sin(rotationRef.current) + point.z * Math.cos(rotationRef.current);
+        const x = point.x * Math.cos(rotationRef.current) - point.z * Math.sin(rotationRef.current);
+        const y = point.y;
+        const z = point.x * Math.sin(rotationRef.current) + point.z * Math.cos(rotationRef.current);
 
         const tiltAngle = Math.PI / 4;
         const newY = y * Math.cos(tiltAngle) - z * Math.sin(tiltAngle);

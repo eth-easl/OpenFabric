@@ -7,7 +7,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	mrand "math/rand"
+	"net"
 	"ocf/internal/common"
 	"strconv"
 	"sync"
@@ -193,34 +195,181 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 
 // startAutoReconnect periodically checks if we lost connectivity and attempts to reconnect to bootstraps with backoff.
 func startAutoReconnect(ctx context.Context, h host.Host) {
-	// exponential backoff parameters
-	minDelay := 5 * time.Second
-	maxDelay := 2 * time.Minute
-	delay := minDelay
+	const (
+		healthCheckInterval = 30 * time.Second
+		minBackoff          = 5 * time.Second
+		maxBackoff          = 2 * time.Minute
+		dialTimeout         = 10 * time.Second
+	)
+
+	attempt := 0
+
 	for {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return
-		case <-time.After(30 * time.Second):
-			// If very few or zero peers, try bootstrap
-			conns := h.Network().Conns()
-			if len(conns) == 0 {
+		}
+
+		if len(h.Network().Conns()) == 0 {
+			attempt++
+			if attempt == 1 {
 				common.Logger.Warn("No active P2P connections; attempting reconnect to bootstraps...")
-				Reconnect()
-				// after a reconnect attempt, wait with backoff if still disconnected
-				time.Sleep(delay)
-				if delay < maxDelay {
-					delay *= 2
-					if delay > maxDelay {
-						delay = maxDelay
-					}
-				}
 			} else {
-				// reset backoff when connected
-				delay = minDelay
+				backoff := backoffDelay(attempt-1, minBackoff, maxBackoff)
+				common.Logger.With("attempt", attempt).Warnf("Reconnect will retry after %s", backoff)
+				if !waitFor(ctx, backoff) {
+					return
+				}
 			}
+
+			if tryReconnectToBootstraps(ctx, h, dialTimeout) {
+				if attempt > 1 {
+					common.Logger.Infof("P2P connectivity restored after %d attempts; resetting backoff", attempt)
+				}
+				attempt = 0
+				if !waitFor(ctx, healthCheckInterval) {
+					return
+				}
+				continue
+			}
+
+			// Failed attempt; loop and escalate backoff
+			continue
+		}
+
+		if attempt > 0 {
+			common.Logger.Infof("P2P connectivity restored; resetting backoff")
+			attempt = 0
+		}
+
+		if !waitFor(ctx, healthCheckInterval) {
+			return
 		}
 	}
+}
+
+func tryReconnectToBootstraps(ctx context.Context, h host.Host, dialTimeout time.Duration) bool {
+	mode := viper.GetString("mode")
+	addrs := getDefaultBootstrapPeers(nil, mode)
+	if len(addrs) == 0 {
+		common.Logger.Warn("Reconnect attempt skipped: no bootstrap addresses configured")
+		return false
+	}
+
+	peerInfos, err := peer.AddrInfosFromP2pAddrs(addrs...)
+	if err != nil {
+		common.Logger.Error("Failed to parse bootstrap peers during reconnect: ", err)
+		return false
+	}
+
+	successes := 0
+	for _, info := range peerInfos {
+		if info.ID == h.ID() {
+			continue
+		}
+
+		if h.Network().Connectedness(info.ID) == network.Connected {
+			successes++
+			continue
+		}
+
+		if len(info.Addrs) == 0 {
+			common.Logger.With("peer", info.ID).Warn("Bootstrap peer has no address; skipping")
+			continue
+		}
+
+		connectCtx, cancel := context.WithTimeout(ctx, dialTimeout)
+		err := h.Connect(connectCtx, info)
+		cancel()
+
+		if err != nil {
+			if isTransientNetworkError(err) {
+				common.Logger.With("peer", info.ID).Debugf("Transient error connecting to bootstrap: %v", err)
+			} else {
+				common.Logger.With("peer", info.ID).Warnf("Failed to connect to bootstrap: %v", err)
+			}
+			continue
+		}
+
+		common.Logger.Infof("Connected to bootstrap peer %s", info.ID)
+		successes++
+	}
+
+	if successes > 0 {
+		go Reconnect()
+		return true
+	}
+
+	common.Logger.Warn("Reconnect attempt failed; no bootstrap peers reachable")
+	return false
+}
+
+func waitFor(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return true
+	}
+
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func backoffDelay(attempt int, minDelay, maxDelay time.Duration) time.Duration {
+	base := backoffBaseDelay(attempt, minDelay, maxDelay)
+	if base <= 0 {
+		return minDelay
+	}
+
+	jitterMax := base / 3
+	if jitterMax <= 0 {
+		return base
+	}
+
+	randSrc := mrand.New(mrand.NewSource(time.Now().UnixNano()))
+	jitter := time.Duration(randSrc.Int63n(int64(jitterMax)))
+	return base + jitter
+}
+
+func backoffBaseDelay(attempt int, minDelay, maxDelay time.Duration) time.Duration {
+	if attempt <= 1 {
+		return minDelay
+	}
+
+	delay := minDelay
+	for i := 1; i < attempt; i++ {
+		delay *= 2
+		if delay >= maxDelay {
+			return maxDelay
+		}
+	}
+
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	return delay
+}
+
+func isTransientNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return netErr.Timeout()
+	}
+
+	return false
 }
 
 func newDHT(ctx context.Context, h host.Host, ds datastore.Batching) (*dualdht.DHT, error) {

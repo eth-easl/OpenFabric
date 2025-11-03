@@ -78,11 +78,11 @@ func (p *Process) Start() *Process {
     }
 	//Call the other functions to stream stdin and stdout
 	err := p.proc.Start()
-	p.pid = p.proc.Process.Pid
-	common.Logger.Debug("Process started with pid: ", p.pid)
 	if err != nil {
 		panic(err)
 	}
+	p.pid = p.proc.Process.Pid
+	common.Logger.Debug("Process started with pid: ", p.pid)
     go p.awaitOutput()
     go p.finishTimeOutOrDie()
 	return p

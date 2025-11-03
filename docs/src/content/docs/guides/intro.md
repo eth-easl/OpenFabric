@@ -24,6 +24,8 @@ We believe that decentralized computing can help us solve these problems, in the
 
 The framework is built on top of [LibP2P](https://libp2p.io/), which connects the computing resources in a peer-to-peer network. Each request will be routed to a peer that is able to handle the request. We aim to make the routing as efficient as possible.
 
+The platform also integrates Web3 wallet technology for node owner identification and authentication, enabling decentralized trust and incentive mechanisms.
+
 ## Demo
 
 We run a public instance of OCF as the inference API. For more machine learning as a service, please visit [MLaaS](/guides/ml_inference/).

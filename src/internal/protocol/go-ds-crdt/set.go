@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"time"
 
 	dshelp "github.com/ipfs/boxo/datastore/dshelp"
 	cid "github.com/ipfs/go-cid"
@@ -511,6 +512,7 @@ func (s *set) putTombs(ctx context.Context, tombs []*pb.Element) error {
 		return nil
 	}
 
+	var tsBuf [8]byte
 	var store ds.Write = s.store
 	var err error
 	batchingDs, batching := store.(ds.Batching)
@@ -555,7 +557,8 @@ func (s *set) putTombs(ctx context.Context, tombs []*pb.Element) error {
 
 		// Write tomb into store.
 		k := s.tombsPrefix(key).ChildString(id)
-		err = store.Put(ctx, k, nil)
+		binary.BigEndian.PutUint64(tsBuf[:], uint64(time.Now().Unix()))
+		err = store.Put(ctx, k, tsBuf[:])
 		if err != nil {
 			return err
 		}

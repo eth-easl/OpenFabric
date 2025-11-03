@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, CirclePlay } from "lucide-react";
+import { CirclePlay } from "lucide-react";
 import AnimatedGlobe from "./animated-globe";
+import { WalletConnect } from "./wallet-connect";
 
 const Hero = () => {
   return (
@@ -18,16 +19,12 @@ const Hero = () => {
             A peer-to-peer framework for decentralized computing. Connect computing resources globally, run ML inference at scale, and eliminate single points of failure with our LibP2P-based distributed system.
           </p>
           <div className="mt-12 flex flex-col sm:flex-row items-center gap-4">
-            <Button
-              size="lg"
-              className="w-full sm:w-auto rounded-full text-base"
-            >
-              Get Started <ArrowUpRight className="!h-5 !w-5" />
-            </Button>
+            <WalletConnect />
             <Button
               variant="outline"
               size="lg"
-              className="w-full sm:w-auto rounded-full text-base shadow-none"
+              className="w-full sm:w-auto rounded-lg text-base shadow-none"
+              onClick={() => window.open('https://docs.example.com', '_blank')}
             >
               <CirclePlay className="!h-5 !w-5" /> Try Demo
             </Button>

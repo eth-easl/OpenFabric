@@ -1116,6 +1116,11 @@ func (store *Datastore) Sync(ctx context.Context, prefix ds.Key) error {
 	return multierr.Combine(err, err2)
 }
 
+// Context returns the lifecycle context associated with this datastore.
+func (store *Datastore) Context() context.Context {
+	return store.ctx
+}
+
 // Close shuts down the CRDT datastore. It should not be used afterwards.
 func (store *Datastore) Close() error {
 	store.cancel()

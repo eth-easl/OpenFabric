@@ -3,6 +3,7 @@ import { Logo } from "./logo";
 import { NavMenu } from "./nav-menu";
 import { NavigationSheet } from "./navigation-sheet";
 import ThemeToggle from "../theme-toggle";
+import { WalletConnect } from "@/components/wallet-connect";
 
 const Navbar = () => {
   return (
@@ -15,6 +16,7 @@ const Navbar = () => {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
+          <WalletConnect />
           <Button variant="outline" className="hidden sm:inline-flex" asChild>
             <a href="https://github.com/ResearchComputer/OpenComputeFramework" target="_blank">
               GitHub

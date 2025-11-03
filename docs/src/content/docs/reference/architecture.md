@@ -13,6 +13,7 @@ Open Compute Framework (OCF) forms a decentralized compute fabric using LibP2P f
 - CRDT Node Table: A distributed datastore (Badger + go-ds-crdt) maintaining a map of peers and their advertised services. Updates propagate via pubsub.
 - HTTP Gateway: Each node exposes an HTTP API on port 8092 and a P2P HTTP listener over LibP2P.
 - Service Registry: Workers can register services (e.g., `llm`) and identity groups (e.g., `model=gpt2`). Global routing uses these identities.
+- Wallet Integration: Node owner identification and management through cryptographic wallets for authentication and authorization.
 
 ## Bootstrapping and modes
 

@@ -26,7 +26,7 @@ vacuum:
 queue:
   port: "8094"
 account:
-  wallet: ""
+  wallet: ""       # Wallet account address for node identification
 seed: "0"          # 0 = persisted/random key
 tcp_port: "43905"  # LibP2P TCP/WS
 udp_port: "59820"  # LibP2P QUIC
@@ -34,7 +34,9 @@ udp_port: "59820"  # LibP2P QUIC
 
 # Common options
 
-- `bootstrap.addr`: Either an HTTP URL returning `{ bootstraps: ["<multiaddr>"] }` or a single multiaddr like `/ip4/198.51.100.10/tcp/43905/p2p/<ID>`.
+- `bootstrap.addr`: Legacy single-source value. Accepts an HTTP URL or one multiaddr.
+- `bootstrap.sources`: Ordered list of sources (HTTP URLs, `dnsaddr://host`, and multiaddrs). The resolver walks the list until it collects addresses.
+- `bootstrap.static`: Convenience list of multiaddrs that are appended after dynamic sources.
 - `public-addr`: Public IPv4 address to advertise (enables bootstrap).
 - `mode`: `standalone`, `local`, or the default networked mode (set `node` or `full`).
 
@@ -46,7 +48,9 @@ Minimal dispatcher:
 port: "8092"
 mode: node
 bootstrap:
-  addr: "http://152.67.71.5:8092/v1/dnt/bootstraps"
+  sources:
+    - "http://152.67.71.5:8092/v1/dnt/bootstraps"
+    - "dnsaddr://bootstrap.ocf.example.com"
 ```
 
 Public bootstrap:
@@ -63,6 +67,13 @@ Worker registering an LLM service:
 service:
   name: llm
   port: "8080"
+```
+
+Node with wallet identification:
+
+```yaml
+account:
+  wallet: "your_wallet_address_here"
 ```
 
 
