@@ -43,6 +43,7 @@ func loadKeyFromFile() crypto.PrivKey {
 	common.Logger.Info("Looking for keys under: ", keyPath)
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
+		common.Logger.Error("Error while reading private key file: ", err)
 		return nil
 	}
 	priv, err := crypto.UnmarshalPrivateKey(keyData)

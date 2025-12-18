@@ -72,6 +72,7 @@ func newHost(ctx context.Context, seed int64, ds datastore.Batching) (host.Host,
 		// try to load from the file
 		priv = loadKeyFromFile()
 		if priv == nil {
+			common.Logger.Info("No existing private key found, generating a new one...")
 			r := rand.Reader
 			priv, _, err = crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
 			if err != nil {
