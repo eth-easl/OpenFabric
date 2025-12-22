@@ -86,7 +86,7 @@ func StartTicker() {
 			len(connectedPeers), len(allPeers))
 
 		// Log if we have very few connections (potential issue)
-		if len(connectedPeers) < 3 {
+		if len(connectedPeers) == 0 {
 			common.Logger.Warnf("Low connection count detected: only %d connected peers", len(connectedPeers))
 			Reconnect()
 			// best-effort re-announce our services after trying to reconnect
