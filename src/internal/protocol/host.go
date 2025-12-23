@@ -427,10 +427,6 @@ func ConnectedBootstraps() []string {
 			}
 		}
 	}
-	// add myself as bootstrap
-	myaddr := host.Addrs()[0].String() + "/p2p/" + host.ID().String()
-	bootstraps = append(bootstraps, myaddr)
-	// deduplicate
 	bootstraps = common.DeduplicateStrings(bootstraps)
 	return bootstraps
 }

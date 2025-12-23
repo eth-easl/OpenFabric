@@ -219,7 +219,11 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 	proxy.Director = director
 	proxy.Transport = tr
 	proxy.ErrorHandler = ErrorHandler
-	proxy.ModifyResponse = rewriteHeader()
+	proxy.ModifyResponse = func(r *http.Response) error {
+		rewriteHeader()(r)
+		r.Header.Set("X-Computing-Node", targetPeer)
+		return nil
+	}
 
 	// Wrap the response writer to handle streaming properly
 	streamWriter := &StreamAwareResponseWriter{

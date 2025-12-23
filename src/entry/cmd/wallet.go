@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"ocf/internal/wallet"
 	"time"
-
 	"github.com/spf13/cobra"
 )
 
