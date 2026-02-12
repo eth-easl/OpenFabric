@@ -11,6 +11,7 @@ import (
 	mrand "math/rand"
 	"net"
 	"ocf/internal/common"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -49,13 +50,15 @@ func GetP2PNode(ds datastore.Batching) (host.Host, dualdht.DHT) {
 		// try to parse the seed as int64
 		seedInt, err := strconv.ParseInt(seed, 10, 64)
 		if err != nil {
-			panic(err)
+			common.Logger.Info("Seed is not a valid int64 value")
+			os.Exit(1)
 		}
 		host, err := newHost(ctx, seedInt, ds)
 		MyID = host.ID().String()
 		P2PNode = &host
 		if err != nil {
-			panic(err)
+			common.Logger.Error("Error while creating P2P node: ", err)
+			os.Exit(1)
 		}
 	})
 	return *P2PNode, *ddht
