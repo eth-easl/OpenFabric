@@ -110,7 +110,7 @@ jobs:
       - name: GolangCI-Lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.60.3
+          version: v2.4.0
           working-directory: src
           args: --timeout=5m
 
