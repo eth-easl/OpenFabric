@@ -1,8 +1,6 @@
 # OpenFabric
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289da?logo=discord&logoColor=white)](https://discord.gg/rAWBxT9crz) ![CI](https://github.com/ResearchComputer/OpenFabric/actions/workflows/ci.yml/badge.svg)
-
-**OpenFabric** (Aka: Open Compute Framework) is a robust, distributed computing platform designed to orchestrate computing resources across a decentralized network. It leverages peer-to-peer networking, CRDT-based state management, and blockchain integration to create a resilient and scalable research computer.
+**OpenFabric** (Aka: Open Compute Framework) is a robust, distributed computing platform designed to orchestrate computing resources across a decentralized network. It leverages peer-to-peer networking, CRDT-based state management to create a resilient and scalable research computer.
 
 ## Features
 
