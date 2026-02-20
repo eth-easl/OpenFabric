@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -101,7 +102,6 @@ func (s *StreamAwareResponseWriter) WriteHeader(statusCode int) {
 	// Enable streaming headers if this is a streaming response
 	if s.ResponseWriter.Header().Get("Content-Type") == "text/event-stream" {
 		s.ResponseWriter.Header().Set("Cache-Control", "no-cache")
-		s.ResponseWriter.Header().Set("Connection", "keep-alive")
 		s.ResponseWriter.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
 	}
 	s.ResponseWriter.WriteHeader(statusCode)
@@ -111,6 +111,35 @@ func (s *StreamAwareResponseWriter) Flush() {
 	if s.flusher != nil {
 		s.flusher.Flush()
 	}
+}
+
+// Unwrap for Go 1.20+ ResponseController compatibility
+func (s *StreamAwareResponseWriter) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
+}
+
+// Hijack implements http.Hijacker
+func (s *StreamAwareResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := s.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, http.ErrNotSupported
+}
+
+// CloseNotify implements http.CloseNotifier (deprecated but ReverseProxy may still check it)
+func (s *StreamAwareResponseWriter) CloseNotify() <-chan bool {
+	if cn, ok := s.ResponseWriter.(http.CloseNotifier); ok {
+		return cn.CloseNotify()
+	}
+	return nil
+}
+
+// Push implements http.Pusher
+func (s *StreamAwareResponseWriter) Push(target string, opts *http.PushOptions) error {
+	if p, ok := s.ResponseWriter.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 // P2P handler for forwarding requests to other peers
@@ -137,9 +166,6 @@ func P2PForwardHandler(c *gin.Context) {
 
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
-		if strings.HasPrefix(req.Header.Get("Content-Type"), "application/grpc") {
-			req.URL.Scheme = "https"
-		}
 		req.URL.Path = target.Path
 		req.URL.Host = req.Host
 		req.Host = target.Host
@@ -183,9 +209,6 @@ func ServiceForwardHandler(c *gin.Context) {
 		req.Host = target.Host
 		req.URL.Host = req.Host
 		req.URL.Scheme = target.Scheme
-		if strings.HasPrefix(req.Header.Get("Content-Type"), "application/grpc") {
-			req.URL.Scheme = "https"
-		}
 		req.URL.Path = target.Path
 	}
 	proxy := httputil.NewSingleHostReverseProxy(&target)
@@ -284,9 +307,6 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 	}
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
-		if strings.HasPrefix(req.Header.Get("Content-Type"), "application/grpc") {
-			req.URL.Scheme = "https"
-		}
 		req.URL.Path = target.Path
 		req.URL.Host = req.Host
 		req.Host = target.Host

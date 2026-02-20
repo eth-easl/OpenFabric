@@ -14,7 +14,7 @@ Prior to this feature, the OpenFabric HTTP proxy was limited to HTTP/1.1 forward
 ## How it Works
 1. **HTTP/2 Cleartext (`h2c`)**: The local OpenFabric node exposes an `h2c` enabled HTTP listener. This allows a local gRPC client to send unencrypted HTTP/2 frames directly to the node without requiring TLS certificates.
 2. **Protocol Detection**: When the proxy handler receives a request, it inspects the `Content-Type` header. If it detects `application/grpc`, it classifies the request as gRPC traffic.
-3. **P2P Tunneling**: Instead of using the standard HTTP/1.1 `http.Transport`, gRPC requests are routed through a specialized `http2.Transport`. This transport overrides the `DialTLSContext` hook to hijack the dialing sequence, tunneling the HTTP/2 connection directly over a `gostream.Dial` libp2p stream down to the target node.
+3. **P2P Tunneling**: Instead of using the standard HTTP/1.1 `http.Transport`, gRPC requests are routed through a specialized `http2.Transport` using the standard `http` scheme. This transport leverages `AllowHTTP: true` and overrides the `DialTLSContext` hook to tunnel the HTTP/2 cleartext connection directly over a `gostream.Dial` libp2p stream down to the target node, without conflating TLS semantics.
 
 ## Usage Guide
 

@@ -22,10 +22,6 @@ import (
 func mockP2PForwardHandler(c *gin.Context, targetURL *url.URL) {
 	director := func(req *http.Request) {
 		req.URL.Scheme = targetURL.Scheme
-		if strings.HasPrefix(req.Header.Get("Content-Type"), "application/grpc") {
-			// Trigger DialTLSContext without actual TLS
-			req.URL.Scheme = "https" 
-		}
 		req.URL.Path = targetURL.Path + c.Param("path")
 		req.URL.Host = req.Host
 		req.Host = targetURL.Host
@@ -99,3 +95,23 @@ func TestGRPCProxyRouting(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "mock-grpc-response", string(respBody))
 }
+
+func TestGlobalH2CTransport(t *testing.T) {
+	// Initialize myself so GetP2PNode doesn't nil panic if it relies on package state
+	// (depends on protocol init, assuming it's safe to call or transport does it lazily)
+	transport := getGlobalH2CTransport()
+	require.NotNil(t, transport)
+	require.True(t, transport.AllowHTTP)
+
+	// Test with invalid peer ID
+	_, err := transport.DialTLSContext(context.Background(), "tcp", "invalid-peer-id:8080", nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to decode peer ID")
+
+	// Test with a valid peer ID (gostream.Dial will likely fail to connect since no actual node exists locally or peer is unreachable, but we test the decode part passes)
+	validPeerID := "12D3KooWNLAigNKKAmFQSeBCFpAYHpkDKFg8CQhL2B5H2fJrEog2"
+	_, err = transport.DialTLSContext(context.Background(), "tcp", validPeerID+":8080", nil)
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), "failed to decode peer ID")
+}
+
