@@ -71,17 +71,17 @@ jobs:
               run: |
                   cd src
                   GOOS=linux GOARCH=amd64 GIN_MODE=release go build -trimpath -tags "" -ldflags "-X main.version=${VERSION} -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${BUILD_DATE}" -o ./build/release/ ./entry/...
-                  mv build/release/entry build/release/ocf-amd64
+                  mv build/release/entry build/release/otela-amd64
                   GOOS=linux GOARCH=arm64 GIN_MODE=release go build -trimpath -tags "" -ldflags "-X main.version=${VERSION} -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${BUILD_DATE}" -o ./build/release/ ./entry/...
-                  mv build/release/entry build/release/ocf-arm64
+                  mv build/release/entry build/release/otela-arm64
 
             - name: Create GitHub Release
               id: create_release
               uses: softprops/action-gh-release@v2
               with:
                   files: |
-                      src/build/release/ocf-amd64
-                      src/build/release/ocf-arm64
+                      src/build/release/otela-amd64
+                      src/build/release/otela-arm64
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
