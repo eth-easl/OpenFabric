@@ -9,7 +9,7 @@ The first node, or we call it the head node, is a standalone node that serves as
 Once you have OpenTela installed, you can spin up the head node with the following command:
 
 ```bash
-./ocf start --mode standalone --public-addr {YOUR_IP_ADDR} --seed 0
+./otela start --mode standalone --public-addr {YOUR_IP_ADDR} --seed 0
 ```
 
 In the above command:
@@ -75,7 +75,7 @@ As you can see, there is only one node in the cluster now, which is the head nod
 The second node, or we call it the `worker node`, is a node that connects to the head node and serves as a worker in your cluster. This node should be a machine with GPU resources, so it can serve LLMs and handle requests from users. We use vLLM as an example of the LLM serving framework (and assume that you have already installed it according to [vLLM docs](https://docs.vllm.ai/en/stable/getting_started/installation/gpu/#requirements), and that you have `vllm` command ready in your $PATH). Once you have OpenTela and vLLM installed, you can spin up the worker node and connect it to the head node with the following command:
 
 ```bash
-./ocf start --bootstrap.addr /ip4/{YOUR_IP_ADDR}/tcp/43905/p2p/{YOUR_HEAD_NODE_PEER_ID} --subprocess "vllm serve Qwen/Qwen3-8B --max_model_len 16384 --port 8080" --service.name llm --service.port 8080 --seed 1
+./otela start --bootstrap.addr /ip4/{YOUR_IP_ADDR}/tcp/43905/p2p/{YOUR_HEAD_NODE_PEER_ID} --subprocess "vllm serve Qwen/Qwen3-8B --max_model_len 16384 --port 8080" --service.name llm --service.port 8080 --seed 1
 ```
 
 In the above command:
