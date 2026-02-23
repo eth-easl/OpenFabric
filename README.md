@@ -27,6 +27,7 @@ Tela is the latin word for "Fabric", which refers to the interconnected network 
 
 - [Installation](docs/tutorial/installation.md)
 - [Spin Up a network](docs/tutorial/spinup.md)
+- [How requests are routed](docs/tutorial/routing.md)
 - [Glossary](docs/tutorial/glossary.md)
 
 ## Contributing
