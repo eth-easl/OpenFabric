@@ -190,7 +190,7 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 							}
 							continue
 						}
-						igGroup := strings.Split(ig, "=")
+						igGroup := strings.SplitN(ig, "=", 2)
 						if len(igGroup) != 2 {
 							continue
 						}
