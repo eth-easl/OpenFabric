@@ -143,37 +143,29 @@ func ServiceForwardHandler(c *gin.Context) {
 	proxy.ServeHTTP(c.Writer, c.Request)
 }
 
-// in case of global service, we need to forward the request to the service, identified by the service name and identity group
-func GlobalServiceForwardHandler(c *gin.Context) {
-	// Set a longer timeout for AI/ML services
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Minute)
-	defer cancel()
-
-	// Create a copy of the request body to preserve it for streaming
-	// We MUST read body here to inspect IdentityGroup
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+// parseFallbackLevel parses the value of the X-Otela-Fallback header.
+// Valid values are 0, 1, or 2; anything else (including an empty string)
+// returns 0 (the default, exact-match-only behaviour).
+func parseFallbackLevel(header string) int {
+	if header == "" {
+		return 0
 	}
-	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	c.Request = c.Request.WithContext(ctx)
-
-	serviceName := c.Param("service")
-	requestPath := c.Param("path")
-	providers, err := protocol.GetAllProviders(serviceName)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	if lvl, err := strconv.Atoi(header); err == nil && lvl >= 0 && lvl <= 2 {
+		return lvl
 	}
-	// Use the already read bodyBytes instead of reading again
-	body := bodyBytes
-	// find proper service that are within the same identity group
-	// first filter by service name, then iterative over the identity groups
-	// always find all the services that are in the same identity group
-	// Candidates are grouped by match priority: exact > wildcard > catch-all.
-	// We only pick from the highest-priority non-empty tier so that wildcard
-	// and catch-all providers are used only when no exact match is available.
+	return 0
+}
+
+// selectCandidates iterates over the provided peers and returns the peer IDs
+// that are eligible to serve the named service for the given request body.
+//
+// Match priority:  exact (3) > wildcard "*" (2) > catch-all "all" (1).
+// fallbackLevel controls which tiers are considered when no exact match exists:
+//
+//	0 – exact matches only
+//	1 – exact, then wildcard
+//	2 – exact, then wildcard, then catch-all
+func selectCandidates(providers []protocol.Peer, serviceName string, body []byte, fallbackLevel int) []string {
 	var exactCandidates, wildcardCandidates, catchAllCandidates []string
 	for _, provider := range providers {
 		for _, service := range provider.Service {
@@ -228,16 +220,6 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 			}
 		}
 	}
-	// Determine fallback level from the X-Otela-Fallback request header.
-	// 0 (default): exact match only
-	// 1: allow wildcard fallback when no exact match exists
-	// 2: allow wildcard + catch-all fallback
-	fallbackLevel := 0
-	if fbHeader := c.GetHeader("X-Otela-Fallback"); fbHeader != "" {
-		if lvl, err := strconv.Atoi(fbHeader); err == nil && lvl >= 0 && lvl <= 2 {
-			fallbackLevel = lvl
-		}
-	}
 
 	// Pick from the highest-priority non-empty tier, respecting fallback level
 	candidates := exactCandidates
@@ -247,6 +229,40 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 	if len(candidates) == 0 && fallbackLevel >= 2 {
 		candidates = catchAllCandidates
 	}
+	return candidates
+}
+
+// in case of global service, we need to forward the request to the service, identified by the service name and identity group
+func GlobalServiceForwardHandler(c *gin.Context) {
+	// Set a longer timeout for AI/ML services
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Minute)
+	defer cancel()
+
+	// Create a copy of the request body to preserve it for streaming
+	// We MUST read body here to inspect IdentityGroup
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	c.Request = c.Request.WithContext(ctx)
+
+	serviceName := c.Param("service")
+	requestPath := c.Param("path")
+	providers, err := protocol.GetAllProviders(serviceName)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Determine fallback level from the X-Otela-Fallback request header.
+	// 0 (default): exact match only
+	// 1: allow wildcard fallback when no exact match exists
+	// 2: allow wildcard + catch-all fallback
+	fallbackLevel := parseFallbackLevel(c.GetHeader("X-Otela-Fallback"))
+
+	candidates := selectCandidates(providers, serviceName, bodyBytes, fallbackLevel)
 	if len(candidates) == 0 {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No provider found for the requested service."})
 		return
