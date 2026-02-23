@@ -221,6 +221,10 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 				case 1:
 					catchAllCandidates = append(catchAllCandidates, provider.ID)
 				}
+				// Once we've recorded a match for this provider, avoid adding it again
+				if bestMatch > 0 {
+					break
+				}
 			}
 		}
 	}
