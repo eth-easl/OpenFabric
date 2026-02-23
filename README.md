@@ -1,6 +1,7 @@
 # OpenTela
 
-[![GitHub Repo](https://img.shields.io/badge/github-eth--easl%2FOpenTela-black?logo=github)](https://github.com/eth-easl/OpenTela) ![CI Workflow](https://github.com/eth-easl/OpenTela/actions/workflows/ci.yml/badge.svg) [![License](https://img.shields.io/github/license/eth-easl/OpenTela)](LICENSE)
+[![GitHub Repo](https://img.shields.io/badge/github-eth--easl%2FOpenTela-black?logo=github)](https://github.com/eth-easl/OpenTela) ![CI Workflow](https://github.com/eth-easl/OpenTela/actions/workflows/ci.yml/badge.svg) [![License](https://img.shields.io/github/license/eth-easl/OpenTela)](LICENSE) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/eth-easl/OpenTela)
+
 
 **OpenTela** (Aka: OpenFabric) is a distributed computing platform designed to orchestrate computing resources across a decentralized network. It leverages peer-to-peer networking, CRDT-based state management to create a resilient and scalable network of computing resources. It is used to power the [serving system at SwissAI Initiative](https://serving.swissai.cscs.ch).
 
