@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"opentela/internal/common"
 	"opentela/internal/protocol"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -142,6 +143,95 @@ func ServiceForwardHandler(c *gin.Context) {
 	proxy.ServeHTTP(c.Writer, c.Request)
 }
 
+// parseFallbackLevel parses the value of the X-Otela-Fallback header.
+// Valid values are 0, 1, or 2; anything else (including an empty string)
+// returns 0 (the default, exact-match-only behaviour).
+func parseFallbackLevel(header string) int {
+	if header == "" {
+		return 0
+	}
+	if lvl, err := strconv.Atoi(header); err == nil && lvl >= 0 && lvl <= 2 {
+		return lvl
+	}
+	return 0
+}
+
+// selectCandidates iterates over the provided peers and returns the peer IDs
+// that are eligible to serve the named service for the given request body.
+//
+// Match priority:  exact (3) > wildcard "*" (2) > catch-all "all" (1).
+// fallbackLevel controls which tiers are considered when no exact match exists:
+//
+//	0 – exact matches only
+//	1 – exact, then wildcard
+//	2 – exact, then wildcard, then catch-all
+func selectCandidates(providers []protocol.Peer, serviceName string, body []byte, fallbackLevel int) []string {
+	var exactCandidates, wildcardCandidates, catchAllCandidates []string
+	for _, provider := range providers {
+		for _, service := range provider.Service {
+			if service.Name == serviceName {
+				// Track the best (highest-priority) match for this provider.
+				// 0 = no match, 1 = catch-all, 2 = wildcard, 3 = exact
+				bestMatch := 0
+				if len(service.IdentityGroup) > 0 {
+					for _, ig := range service.IdentityGroup {
+						// "all" is a shortcut that matches every request
+						if ig == "all" {
+							if bestMatch < 1 {
+								bestMatch = 1
+							}
+							continue
+						}
+						igGroup := strings.SplitN(ig, "=", 2)
+						if len(igGroup) != 2 {
+							continue
+						}
+						igKey := igGroup[0]
+						igValue := igGroup[1]
+						// "*" wildcard: match if the key exists in the request body (any value)
+						if igValue == "*" {
+							if _, _, _, err := jsonparser.Get(body, igKey); err == nil {
+								if bestMatch < 2 {
+									bestMatch = 2
+								}
+							}
+							continue
+						}
+						// exact match
+						requestGroup, err := jsonparser.GetString(body, igKey)
+						if err == nil && requestGroup == igValue {
+							bestMatch = 3
+							break // can't do better than exact
+						}
+					}
+				}
+				switch bestMatch {
+				case 3:
+					exactCandidates = append(exactCandidates, provider.ID)
+				case 2:
+					wildcardCandidates = append(wildcardCandidates, provider.ID)
+				case 1:
+					catchAllCandidates = append(catchAllCandidates, provider.ID)
+				}
+				// Once we've recorded a match for this provider, avoid adding it again
+				if bestMatch > 0 {
+					break
+				}
+			}
+		}
+	}
+
+	// Pick from the highest-priority non-empty tier, respecting fallback level
+	candidates := exactCandidates
+	if len(candidates) == 0 && fallbackLevel >= 1 {
+		candidates = wildcardCandidates
+	}
+	if len(candidates) == 0 && fallbackLevel >= 2 {
+		candidates = catchAllCandidates
+	}
+	return candidates
+}
+
 // in case of global service, we need to forward the request to the service, identified by the service name and identity group
 func GlobalServiceForwardHandler(c *gin.Context) {
 	// Set a longer timeout for AI/ML services
@@ -165,37 +255,15 @@ func GlobalServiceForwardHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// Use the already read bodyBytes instead of reading again
-	body := bodyBytes
-	// find proper service that are within the same identity group
-	// first filter by service name, then iterative over the identity groups
-	// always find all the services that are in the same identity group
-	var candidates []string
-	for _, provider := range providers {
-		for _, service := range provider.Service {
-			if service.Name == serviceName {
-				var selected = false
-				// check if the service is in the same identity group
-				if len(service.IdentityGroup) > 0 {
-					for _, ig := range service.IdentityGroup {
-						igGroup := strings.Split(ig, "=")
-						igKey := igGroup[0]
-						igValue := igGroup[1]
-						requestGroup, err := jsonparser.GetString(body, igKey)
-						if err == nil && requestGroup == igValue {
-							selected = true
-							break
-						}
-					}
-				}
-				// append the service to the candidates
-				if selected {
-					candidates = append(candidates, provider.ID)
-				}
-			}
-		}
-	}
-	if len(candidates) < 1 {
+
+	// Determine fallback level from the X-Otela-Fallback request header.
+	// 0 (default): exact match only
+	// 1: allow wildcard fallback when no exact match exists
+	// 2: allow wildcard + catch-all fallback
+	fallbackLevel := parseFallbackLevel(c.GetHeader("X-Otela-Fallback"))
+
+	candidates := selectCandidates(providers, serviceName, bodyBytes, fallbackLevel)
+	if len(candidates) == 0 {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "No provider found for the requested service."})
 		return
 	}
