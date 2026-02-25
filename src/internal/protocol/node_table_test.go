@@ -116,3 +116,48 @@ func TestNodeLeaveAndRejoin(t *testing.T) {
 		t.Fatalf("expected updated public address 10.0.0.3, got %s", got.PublicAddress)
 	}
 }
+
+func TestAnnotationInPeer(t *testing.T) {
+	p := Peer{ID: "peer-annotated", PublicAddress: "10.0.0.5", Connected: true, Annotation: "gpu-cluster-1"}
+	b, _ := json.Marshal(p)
+	UpdateNodeTableHook(ds.NewKey("peer-annotated"), b)
+
+	got, err := GetPeerFromTable("peer-annotated")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Annotation != "gpu-cluster-1" {
+		t.Fatalf("expected annotation 'gpu-cluster-1', got '%s'", got.Annotation)
+	}
+
+	// Verify annotation appears in connected peers
+	connected := GetConnectedPeers()
+	cp, ok := (*connected)["/peer-annotated"]
+	if !ok {
+		t.Fatal("expected peer-annotated in connected peers")
+	}
+	if cp.Annotation != "gpu-cluster-1" {
+		t.Fatalf("expected annotation in connected peers, got '%s'", cp.Annotation)
+	}
+}
+
+func TestAnnotationOmittedWhenEmpty(t *testing.T) {
+	p := Peer{ID: "peer-no-annotation", PublicAddress: "10.0.0.6", Connected: true}
+	b, _ := json.Marshal(p)
+
+	// Verify the JSON does not contain "annotation" when empty
+	var raw map[string]interface{}
+	_ = json.Unmarshal(b, &raw)
+	if _, exists := raw["annotation"]; exists {
+		t.Fatal("expected annotation field to be omitted from JSON when empty")
+	}
+
+	UpdateNodeTableHook(ds.NewKey("peer-no-annotation"), b)
+	got, err := GetPeerFromTable("peer-no-annotation")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Annotation != "" {
+		t.Fatalf("expected empty annotation, got '%s'", got.Annotation)
+	}
+}
