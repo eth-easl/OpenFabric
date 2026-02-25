@@ -50,6 +50,7 @@ func init() {
 	startCmd.Flags().String("solana.mint", defaultConfig.Solana.Mint, "SPL token mint to verify ownership")
 	startCmd.Flags().Bool("solana.skip_verification", defaultConfig.Solana.SkipVerification, "Skip Solana token ownership verification (use for testing only)")
 	startCmd.Flags().Bool("cleanslate", true, "Clean slate")
+	startCmd.Flags().String("annotation", "", "Arbitrary annotation string for this node (shown in /v1/dnt/table)")
 	rootcmd.AddCommand(initCmd)
 	rootcmd.AddCommand(startCmd)
 	rootcmd.AddCommand(versionCmd)

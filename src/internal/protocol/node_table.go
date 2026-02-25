@@ -52,6 +52,7 @@ type Peer struct {
 	Hardware          common.HardwareSpec `json:"hardware"`
 	Connected         bool                `json:"connected"`
 	Load              []int               `json:"load"`
+	Annotation        string              `json:"annotation,omitempty"`
 }
 
 type PeerWithStatus struct {
@@ -285,6 +286,9 @@ func InitializeMyself(ownerOverride string) {
 	}
 
 	myself.Hardware.GPUs = platform.GetGPUInfo()
+	if annotation := viper.GetString("annotation"); annotation != "" {
+		myself.Annotation = annotation
+	}
 	value, err := json.Marshal(myself)
 	common.ReportError(err, "Error while marshalling peer")
 	err = store.Put(ctx, key, value)
